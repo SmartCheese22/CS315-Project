@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Placement Portal Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans min-h-screen flex flex-col">
+
+    <nav class="bg-indigo-700 text-white p-4 shadow-lg sticky top-0 z-10">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold tracking-wider flex items-center gap-2">
+                🎓 <span class="bg-clip-text text-transparent bg-gradient-to-r from-blue-200 to-white">IITK Placement Admin</span>
+            </h1>
+            <div class="space-x-1">
+                <button onclick="switchTab('dashboard-section')" class="nav-btn px-4 py-2 rounded-lg hover:bg-indigo-600 transition font-medium">Dashboard</button>
+                <button onclick="switchTab('company-section')" class="nav-btn px-4 py-2 rounded-lg hover:bg-indigo-600 transition font-medium">Company Stats</button>
+                <button onclick="switchTab('tracker-section')" class="nav-btn px-4 py-2 rounded-lg hover:bg-indigo-600 transition font-medium">Student Tracker</button>
+                <button onclick="switchTab('offer-section')" class="nav-btn px-4 py-2 rounded-lg bg-yellow-500 text-indigo-900 hover:bg-yellow-400 transition font-bold shadow-md">Manage Offers</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-6xl mx-auto w-full mt-8 p-4 flex-grow">
+        
+        <div id="dashboard-section" class="tab-content bg-white p-6 rounded-xl shadow-md border border-gray-100">
+            <h2 class="text-2xl font-semibold mb-6 text-gray-700 border-b pb-2">Branch-wise Placement Dashboard</h2>
+            <div class="overflow-x-auto rounded-lg shadow-sm border border-gray-200">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50 text-gray-600 border-b">
+                            <th class="p-4 font-semibold">Branch</th>
+                            <th class="p-4 font-semibold">Total Students</th>
+                            <th class="p-4 font-semibold">Placed</th>
+                            <th class="p-4 font-semibold">Placement %</th>
+                            <th class="p-4 font-semibold">Avg Package (LPA)</th>
+                            <th class="p-4 font-semibold">Max Package (LPA)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dashboard-body">
+                        <tr><td colspan="6" class="p-4 text-center text-gray-500">Loading data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="company-section" class="tab-content hidden bg-white p-6 rounded-xl shadow-md border border-gray-100">
+            <h2 class="text-2xl font-semibold mb-6 text-gray-700 border-b pb-2">Company Recruitment Analytics</h2>
+            <div class="overflow-x-auto rounded-lg shadow-sm border border-gray-200">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50 text-gray-600 border-b">
+                            <th class="p-4 font-semibold">Company</th>
+                            <th class="p-4 font-semibold">Sector</th>
+                            <th class="p-4 font-semibold">Total Roles</th>
+                            <th class="p-4 font-semibold">Total Offers</th>
+                            <th class="p-4 font-semibold">Accepted</th>
+                            <th class="p-4 font-semibold">Avg Package (LPA)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="company-body">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="tracker-section" class="tab-content hidden bg-white p-6 rounded-xl shadow-md border border-gray-100">
+            <h2 class="text-2xl font-semibold mb-6 text-gray-700 border-b pb-2">Student Application Tracker</h2>
+            
+            <div class="flex gap-3 mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <input type="text" id="roll-input" placeholder="Enter Roll No (e.g. 22B0118)" class="border border-gray-300 p-3 rounded-lg w-72 focus:ring-2 focus:ring-indigo-500 outline-none transition shadow-sm">
+                <button onclick="fetchStudent()" class="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition shadow-md font-medium">Search</button>
+            </div>
+
+            <div class="overflow-x-auto rounded-lg shadow-sm border border-gray-200">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50 text-gray-600 border-b">
+                            <th class="p-4 font-semibold">Company</th>
+                            <th class="p-4 font-semibold">Role & Package</th>
+                            <th class="p-4 font-semibold">Status</th>
+                            <th class="p-4 font-semibold">Latest Round</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tracker-body">
+                        <tr><td colspan="4" class="p-4 text-center text-gray-500">Enter a roll number to view tracker.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="offer-section" class="tab-content hidden bg-white p-6 rounded-xl shadow-md border border-gray-100 border-t-4 border-t-yellow-400">
+            <div class="flex justify-between items-center mb-6 border-b pb-2">
+                <h2 class="text-2xl font-semibold text-gray-700">Manage Active Offers</h2>
+                <span class="bg-red-100 text-red-800 text-xs font-bold px-3 py-1 rounded-full animate-pulse">DB TRIGGER DEMO AREA</span>
+            </div>
+            
+            <div class="overflow-x-auto rounded-lg shadow-sm border border-gray-200">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50 text-gray-600 border-b">
+                            <th class="p-4 font-semibold">Offer ID</th>
+                            <th class="p-4 font-semibold">Student Name</th>
+                            <th class="p-4 font-semibold">Company</th>
+                            <th class="p-4 font-semibold">Role</th>
+                            <th class="p-4 font-semibold">Status</th>
+                            <th class="p-4 font-semibold">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="offer-body">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        const API_URL = 'http://localhost:5000';
+
+        // UI Helper: Switch Tabs
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+            document.getElementById(tabId).classList.remove('hidden');
+            
+            if(tabId === 'dashboard-section') loadDashboard();
+            if(tabId === 'company-section') loadCompanyStats();
+            if(tabId === 'offer-section') loadOffers();
+        }
+
+        // UI Helper: Status Badges
+        function getStatusBadge(status) {
+            const colors = {
+                'offered': 'bg-green-100 text-green-800 border-green-200',
+                'rejected': 'bg-red-100 text-red-800 border-red-200',
+                'shortlisted': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+                'applied': 'bg-blue-100 text-blue-800 border-blue-200',
+                'accepted': 'bg-emerald-500 text-white shadow-sm',
+                'pending': 'bg-gray-100 text-gray-600 border-gray-200'
+            };
+            const colorClass = colors[status] || 'bg-gray-100 text-gray-800';
+            return `<span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${colorClass}">${status}</span>`;
+        }
+
+        // 1. Fetch Dashboard
+        async function loadDashboard() {
+            try {
+                const res = await fetch(`${API_URL}/application/dashboard`);
+                const data = await res.json();
+                const tbody = document.getElementById('dashboard-body');
+                
+                tbody.innerHTML = data.map(row => `
+                    <tr class="border-b hover:bg-indigo-50 transition duration-150">
+                        <td class="p-4 font-bold text-gray-700">${row.branch}</td>
+                        <td class="p-4">${row.total_students}</td>
+                        <td class="p-4">${row.placed_students}</td>
+                        <td class="p-4 font-bold ${row.placement_pct > 50 ? 'text-emerald-600' : 'text-amber-500'}">${row.placement_pct}%</td>
+                        <td class="p-4">${row.avg_package_lpa || '-'}</td>
+                        <td class="p-4">${row.max_package_lpa || '-'}</td>
+                    </tr>
+                `).join('');
+            } catch (err) { console.error("Error", err); }
+        }
+
+        // 2. Fetch Company Stats
+        async function loadCompanyStats() {
+            try {
+                const res = await fetch(`${API_URL}/company/stats`);
+                const data = await res.json();
+                const tbody = document.getElementById('company-body');
+                
+                tbody.innerHTML = data.map(row => `
+                    <tr class="border-b hover:bg-indigo-50 transition duration-150">
+                        <td class="p-4 font-bold text-gray-800">${row.company_name}</td>
+                        <td class="p-4"><span class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs font-semibold">${row.sector}</span></td>
+                        <td class="p-4 text-center">${row.total_roles}</td>
+                        <td class="p-4 text-center">${row.total_offers}</td>
+                        <td class="p-4 text-center text-emerald-600 font-bold">${row.accepted_offers}</td>
+                        <td class="p-4">${row.avg_package_offered || '-'}</td>
+                    </tr>
+                `).join('');
+            } catch (err) { console.error("Error", err); }
+        }
+
+        // 3. Fetch Student Tracker
+        async function fetchStudent() {
+            const rollNo = document.getElementById('roll-input').value.trim();
+            if(!rollNo) return alert("Please enter a roll number!");
+
+            try {
+                const res = await fetch(`${API_URL}/student/${rollNo}/tracker`);
+                const data = await res.json();
+                const tbody = document.getElementById('tracker-body');
+                
+                if(data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-gray-500 font-medium">No applications found for ${rollNo}.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = data.map(row => `
+                    <tr class="border-b hover:bg-indigo-50 transition duration-150">
+                        <td class="p-4 font-bold text-gray-800">${row.company_name}</td>
+                        <td class="p-4">
+                            <div class="font-medium">${row.role_title}</div>
+                            <div class="text-xs text-gray-500 font-semibold mt-1 bg-gray-100 inline-block px-2 py-0.5 rounded">${row.role_package} LPA</div>
+                        </td>
+                        <td class="p-4">${getStatusBadge(row.app_status)}</td>
+                        <td class="p-4 text-gray-600">
+                            <div>${row.latest_round_type || 'Resume Screening'}</div>
+                            <div class="text-xs font-semibold mt-1 uppercase text-gray-400">${row.latest_round_result || 'pending'}</div>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (err) { console.error("Error", err); }
+        }
+
+        // 4. Fetch Offers
+        async function loadOffers() {
+            try {
+                const res = await fetch(`${API_URL}/offer`);
+                const data = await res.json();
+                const tbody = document.getElementById('offer-body');
+                
+                tbody.innerHTML = data.map(row => `
+                    <tr class="border-b hover:bg-yellow-50 transition duration-150">
+                        <td class="p-4 font-mono text-gray-500">#${row.offer_id}</td>
+                        <td class="p-4 font-bold text-gray-800">${row.student_name}</td>
+                        <td class="p-4 font-semibold text-indigo-700">${row.company}</td>
+                        <td class="p-4">${row.role} <span class="text-xs font-bold text-gray-400 ml-1">(${row.package_offered}LPA)</span></td>
+                        <td class="p-4">${getStatusBadge(row.acceptance_status)}</td>
+                        <td class="p-4">
+                            ${row.acceptance_status === 'pending' 
+                                ? `<button onclick="acceptOffer(${row.offer_id})" class="bg-green-500 hover:bg-green-600 text-white font-bold py-1.5 px-4 rounded-lg shadow transition transform hover:scale-105 active:scale-95 text-sm">Accept</button>` 
+                                : `<span class="text-gray-400 text-sm font-medium italic">Action closed</span>`
+                            }
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (err) { console.error("Error", err); }
+        }
+
+        // 5. Fire DB Trigger!
+        async function acceptOffer(offerId) {
+            if(!confirm("Are you sure? This will trigger the database to auto-reject all other pending applications for this student!")) return;
+
+            try {
+                const res = await fetch(`${API_URL}/offer/${offerId}/accept`, { method: 'PUT' });
+                const result = await res.json();
+                
+                alert(`✅ DB TRIGGER FIRED!\n\n${result.message}`);
+                
+                // Refresh data to show the changes
+                loadOffers();
+                loadDashboard();
+            } catch (err) { console.error("Error", err); }
+        }
+
+        // Initialize
+        loadDashboard();
+    </script>
+</body>
+</html>

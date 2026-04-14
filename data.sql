@@ -1,306 +1,335 @@
-CREATE DATABASE library_management_system;
-USE library_management_system;
+-- ============================================================
+-- CAMPUS PLACEMENT PORTAL — CS315 IITK
+-- data.sql : schema + triggers + views + seed data
+-- ============================================================
 
--- Initialize all the tables.
-CREATE TABLE category(
-    category_id INTEGER PRIMARY KEY AUTO_INCREMENT,
-    category_name VARCHAR(255) NOT NULL
+USE placement_portal;
+
+-- ── TABLES ──────────────────────────────────────────────────
+
+CREATE TABLE STUDENT (
+    student_id   INT AUTO_INCREMENT PRIMARY KEY,
+    roll_no      VARCHAR(20) UNIQUE NOT NULL,
+    name         VARCHAR(100) NOT NULL,
+    branch       VARCHAR(50) NOT NULL,
+    cpi          DECIMAL(4,2) NOT NULL,
+    grad_year    INT NOT NULL,
+    eligible     BOOLEAN DEFAULT TRUE
 );
 
-CREATE TABLE publisher(
-    publisher_id INTEGER PRIMARY KEY AUTO_INCREMENT,
-    publisher_name VARCHAR(255) NOT NULL,
-    publication_language VARCHAR(255) NOT NULL
+CREATE TABLE COMPANY (
+    company_id   INT AUTO_INCREMENT PRIMARY KEY,
+    name         VARCHAR(100) NOT NULL,
+    sector       VARCHAR(50),
+    hr_contact   VARCHAR(100),
+    min_cpi      DECIMAL(4,2) DEFAULT 0.00
 );
 
-CREATE TABLE location(
-    location_id INTEGER PRIMARY KEY AUTO_INCREMENT,
-    floor_no INTEGER,
-    shelf_no INTEGER
+CREATE TABLE JOB_ROLE (
+    role_id      INT AUTO_INCREMENT PRIMARY KEY,
+    company_id   INT NOT NULL,
+    title        VARCHAR(100) NOT NULL,
+    package_lpa  DECIMAL(6,2) NOT NULL,
+    location     VARCHAR(100),
+    openings     INT NOT NULL,
+    is_open      BOOLEAN DEFAULT TRUE,
+    FOREIGN KEY (company_id) REFERENCES COMPANY(company_id) ON DELETE CASCADE
 );
 
-CREATE TABLE author(
-    author_id INTEGER PRIMARY KEY AUTO_INCREMENT,
-    author_name VARCHAR(255) NOT NULL
+CREATE TABLE APPLICATION (
+    app_id       INT AUTO_INCREMENT PRIMARY KEY,
+    student_id   INT NOT NULL,
+    role_id      INT NOT NULL,
+    status       ENUM('applied','shortlisted','rejected','offered') DEFAULT 'applied',
+    applied_date DATE NOT NULL,
+    UNIQUE (student_id, role_id),
+    FOREIGN KEY (student_id) REFERENCES STUDENT(student_id) ON DELETE CASCADE,
+    FOREIGN KEY (role_id)    REFERENCES JOB_ROLE(role_id)  ON DELETE CASCADE
 );
 
-CREATE TABLE book(
-    book_id INTEGER PRIMARY KEY AUTO_INCREMENT,
-    book_title VARCHAR(255) NOT NULL,
-    category_id INTEGER,
-    publisher_id INTEGER,
-    publication_year INTEGER,
-    location_id INTEGER,
-    copies_total INTEGER CHECK (copies_total >= 0),
-    copies_available INTEGER,
-    no_of_likes INTEGER DEFAULT 0,
-    FOREIGN KEY (category_id) REFERENCES category(category_id),
-    FOREIGN KEY (publisher_id) REFERENCES publisher(publisher_id),
-    FOREIGN KEY (location_id) REFERENCES location(location_id)
+CREATE TABLE INTERVIEW_ROUND (
+    round_id     INT AUTO_INCREMENT PRIMARY KEY,
+    app_id       INT NOT NULL,
+    round_no     INT NOT NULL,
+    round_type   VARCHAR(50) NOT NULL,
+    result       ENUM('pending','pass','fail') DEFAULT 'pending',
+    round_date   DATE,
+    FOREIGN KEY (app_id) REFERENCES APPLICATION(app_id) ON DELETE CASCADE
 );
 
-ALTER TABLE book
-ADD CONSTRAINT chk_copies_valid
-CHECK (copies_available >= 0 AND copies_available <= copies_total);
-
-CREATE TABLE book_author(
-    book_id INTEGER,
-    author_id INTEGER,
-    PRIMARY KEY (book_id, author_id),
-    FOREIGN KEY (book_id) REFERENCES book(book_id),
-    FOREIGN KEY (author_id) REFERENCES author(author_id)
+CREATE TABLE OFFER (
+    offer_id          INT AUTO_INCREMENT PRIMARY KEY,
+    student_id        INT NOT NULL,
+    role_id           INT NOT NULL,
+    package_offered   DECIMAL(6,2) NOT NULL,
+    acceptance_status ENUM('pending','accepted','declined') DEFAULT 'pending',
+    offer_date        DATE NOT NULL,
+    FOREIGN KEY (student_id) REFERENCES STUDENT(student_id) ON DELETE CASCADE,
+    FOREIGN KEY (role_id)    REFERENCES JOB_ROLE(role_id)  ON DELETE CASCADE
 );
 
-CREATE TABLE user(
-    user_id INTEGER PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    mobile_no VARCHAR(255) UNIQUE NOT NULL,
-    total_fine INTEGER NOT NULL DEFAULT 0
-);
+-- ── INDEXES ─────────────────────────────────────────────────
 
-CREATE TABLE book_request(
-    user_id INTEGER,
-    book_id INTEGER,
-    request_date DATETIME,
-    FOREIGN KEY (user_id) REFERENCES user(user_id),
-    FOREIGN KEY (book_id) REFERENCES book(book_id)
-);
+CREATE INDEX idx_application_status  ON APPLICATION(status);
+CREATE INDEX idx_application_student ON APPLICATION(student_id);
+CREATE INDEX idx_jobrole_company     ON JOB_ROLE(company_id);
+CREATE INDEX idx_student_branch      ON STUDENT(branch);
+CREATE INDEX idx_student_cpi         ON STUDENT(cpi);
 
-CREATE TABLE book_issue(
-    issue_id INTEGER PRIMARY KEY AUTO_INCREMENT,
-    user_id INTEGER,
-    book_id INTEGER,
-    issue_date DATE,
-    return_date DATE,
-    return_status INTEGER DEFAULT 0,
-    FOREIGN KEY (user_id) REFERENCES user(user_id),
-    FOREIGN KEY (book_id) REFERENCES book(book_id)
-);
+-- ── TRIGGERS ────────────────────────────────────────────────
 
-CREATE TABLE fine_due(
-    fine_due_id INTEGER PRIMARY KEY,
-    user_id INTEGER,
-    fine_date DATE,
-    fine_amount INTEGER,
-    FOREIGN KEY (fine_due_id) REFERENCES book_issue(issue_id),
-    FOREIGN KEY (user_id) REFERENCES user(user_id)
-);
+DELIMITER $$
 
-CREATE TABLE manager(
-    manager_id INTEGER PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    mobile_no VARCHAR(255) UNIQUE NOT NULL
-);
-
-CREATE TABLE book_like (
-    user_id INT,
-    book_id INT,
-    PRIMARY KEY (user_id, book_id),
-    FOREIGN KEY (user_id) REFERENCES user(user_id),
-    FOREIGN KEY (book_id) REFERENCES book(book_id)
-);
-
-CREATE TABLE book_return(
-    return_id INTEGER PRIMARY KEY AUTO_INCREMENT,
-    user_id INTEGER,
-    book_id INTEGER,
-    return_date DATE,
-    FOREIGN KEY (user_id) REFERENCES user(user_id),
-    FOREIGN KEY (book_id) REFERENCES book(book_id)
-);
-
--- Create indexes.
-CREATE INDEX idx_book ON book(no_of_likes DESC);
-CREATE INDEX idx_book_issue ON book_issue(book_id, user_id);
-CREATE INDEX idx_book_category ON book(category_id);
-CREATE INDEX idx_bookauthor_bookid ON book_author(book_id);
-CREATE INDEX idx_bookauthor_authorid ON book_author(author_id);
-
--- Create procedures.
--- For recommending books to users based on their likes and categories.
-DELIMITER //
-CREATE PROCEDURE get_recommendations(IN uid INT)
-BEGIN
-    -- Collaborative Recommendations
-    SELECT DISTINCT b2.book_id, b2.book_title, 'Collaborative' AS recommendation_type
-    FROM book_like bl1
-    JOIN book_like bl2 ON bl1.user_id = bl2.user_id
-    JOIN book b2 ON b2.book_id = bl2.book_id
-    WHERE bl1.book_id IN (
-        SELECT book_id FROM book_like WHERE user_id = uid
-    )
-    AND bl2.book_id NOT IN (
-        SELECT book_id FROM book_like WHERE user_id = uid
-    )
-    AND bl1.user_id != uid;
-
-    -- Category-Based Recommendations
-    SELECT DISTINCT b2.book_id, b2.book_title, 'Category-Based' AS recommendation_type
-    FROM book_like bl
-    JOIN book b1 ON bl.book_id = b1.book_id
-    JOIN book b2 ON b1.category_id = b2.category_id
-    WHERE bl.user_id = uid
-    AND b2.book_id NOT IN (
-        SELECT book_id FROM book_like WHERE user_id = uid
-    );
-END;
-//
-DELIMITER ;
-
--- For liking a book.
-DELIMITER //
-CREATE PROCEDURE like_book_if_issued(IN uid INT, IN bid INT)
-BEGIN
-    IF NOT EXISTS (
-        SELECT * FROM book_issue
-        WHERE user_id = uid AND book_id = bid
-    ) THEN
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'User must have issued the book to like it';
-    END IF;
-
-    IF EXISTS (
-        SELECT * FROM book_like
-        WHERE user_id = uid AND book_id = bid
-    ) THEN
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'User has already liked this book';
-    END IF;
-
-    INSERT INTO book_like (user_id, book_id)
-    VALUES (uid, bid);
-END;
-//
-DELIMITER ;
-
--- In the same way, create a procedure for disliking a book.
-DELIMITER //
-CREATE PROCEDURE dislike_book(IN uid INT, IN bid INT)
-BEGIN
-    -- check if the user has liked it or not
-    IF NOT EXISTS (
-        SELECT * FROM book_like
-        WHERE user_id = uid AND book_id = bid
-    ) THEN
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'User must have liked the book to dislike it';
-    END IF;
-
-    DELETE FROM book_like
-    WHERE user_id = uid AND book_id = bid;
-END;
-//
-DELIMITER ;
-
-
--- Create a triggers
--- For filling fines.
-DELIMITER //
-CREATE TRIGGER check_fine_after_update
-AFTER UPDATE ON book_issue
+-- TRIGGER 1: CPI eligibility check before a student applies
+CREATE TRIGGER trg_check_cpi_before_apply
+BEFORE INSERT ON APPLICATION
 FOR EACH ROW
 BEGIN
-    DECLARE due_days INT;
-    DECLARE fine_amount INT;
+    DECLARE student_cpi   DECIMAL(4,2);
+    DECLARE required_cpi  DECIMAL(4,2);
+    DECLARE is_eligible   BOOLEAN;
 
-    -- Calculate overdue days (only if return_date is after the expected return_date)
-    IF NEW.return_date IS NOT NULL AND NEW.return_date > OLD.return_date THEN
-        SET due_days = DATEDIFF(NEW.return_date, OLD.return_date);
+    SELECT cpi, eligible INTO student_cpi, is_eligible
+    FROM STUDENT WHERE student_id = NEW.student_id;
 
-        -- Assuming fine is 10 per day
-        SET fine_amount = due_days * 10;
+    SELECT min_cpi INTO required_cpi
+    FROM COMPANY c JOIN JOB_ROLE jr ON c.company_id = jr.company_id
+    WHERE jr.role_id = NEW.role_id;
 
-        -- Insert record into fine_due table
-        IF fine_amount > 0 THEN
-            INSERT INTO fine_due (fine_due_id, user_id, fine_date, fine_amount)
-            VALUES (OLD.issue_id, NEW.user_id, NEW.return_date, fine_amount);
+    IF NOT is_eligible THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Student is marked ineligible for placement.';
+    END IF;
+
+    IF student_cpi < required_cpi THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Student CPI is below the company minimum requirement.';
+    END IF;
+END$$
+
+-- TRIGGER 2: When offer is accepted → auto-reject all other pending applications
+CREATE TRIGGER trg_auto_reject_on_acceptance
+AFTER UPDATE ON OFFER
+FOR EACH ROW
+BEGIN
+    IF NEW.acceptance_status = 'accepted' AND OLD.acceptance_status != 'accepted' THEN
+        -- Reject all other non-offered applications for this student
+        UPDATE APPLICATION
+        SET status = 'rejected'
+        WHERE student_id = NEW.student_id
+          AND status IN ('applied', 'shortlisted')
+          AND role_id != NEW.role_id;
+
+        -- Mark student as no longer eligible (placed)
+        UPDATE STUDENT
+        SET eligible = FALSE
+        WHERE student_id = NEW.student_id;
+    END IF;
+END$$
+
+-- TRIGGER 3: Auto-close role when openings are filled
+CREATE TRIGGER trg_close_role_when_full
+AFTER UPDATE ON OFFER
+FOR EACH ROW
+BEGIN
+    DECLARE accepted_count INT;
+    DECLARE total_openings INT;
+
+    IF NEW.acceptance_status = 'accepted' THEN
+        SELECT COUNT(*) INTO accepted_count
+        FROM OFFER
+        WHERE role_id = NEW.role_id AND acceptance_status = 'accepted';
+
+        SELECT openings INTO total_openings
+        FROM JOB_ROLE WHERE role_id = NEW.role_id;
+
+        IF accepted_count >= total_openings THEN
+            UPDATE JOB_ROLE SET is_open = FALSE WHERE role_id = NEW.role_id;
         END IF;
     END IF;
-END;
-//
+END$$
+
 DELIMITER ;
 
--- For updating the number of likes in the book table.
-DELIMITER //
-CREATE TRIGGER increment_likes
-AFTER INSERT ON book_like
-FOR EACH ROW
-BEGIN
-    UPDATE book
-    SET no_of_likes = no_of_likes + 1
-    WHERE book_id = NEW.book_id;
-END;
-//
-DELIMITER ;
+-- ── VIEWS ───────────────────────────────────────────────────
 
--- For decrementing the number of likes in the book table.
-DELIMITER //
-CREATE TRIGGER decrement_likes
-AFTER DELETE ON book_like
-FOR EACH ROW
-BEGIN
-    UPDATE book
-    SET no_of_likes = no_of_likes - 1
-    WHERE book_id = OLD.book_id;
-END;
-//
-DELIMITER ;
+-- VIEW 1: Branch-wise placement dashboard
+CREATE VIEW placement_dashboard AS
+SELECT
+    s.branch,
+    COUNT(DISTINCT s.student_id)                                      AS total_students,
+    COUNT(DISTINCT CASE WHEN o.acceptance_status = 'accepted'
+                        THEN o.student_id END)                        AS placed_students,
+    ROUND(COUNT(DISTINCT CASE WHEN o.acceptance_status = 'accepted'
+                              THEN o.student_id END)
+          * 100.0 / COUNT(DISTINCT s.student_id), 2)                  AS placement_pct,
+    ROUND(AVG(CASE WHEN o.acceptance_status = 'accepted'
+                   THEN o.package_offered END), 2)                    AS avg_package_lpa,
+    MAX(CASE WHEN o.acceptance_status = 'accepted'
+             THEN o.package_offered END)                              AS max_package_lpa
+FROM STUDENT s
+LEFT JOIN OFFER o ON s.student_id = o.student_id
+GROUP BY s.branch;
 
--- For updating return date.
-CREATE TRIGGER set_return_date
-BEFORE INSERT ON book_issue
-FOR EACH ROW
-SET NEW.return_date = DATE_ADD(NEW.issue_date, INTERVAL 14 DAY);
+-- VIEW 2: Per-student application tracker
+CREATE VIEW application_tracker AS
+SELECT
+    s.name          AS student_name,
+    s.roll_no,
+    s.branch,
+    c.name          AS company_name,
+    jr.title        AS role_title,
+    jr.package_lpa  AS role_package,
+    a.status        AS app_status,
+    a.applied_date,
+    ir.round_no     AS latest_round,
+    ir.round_type   AS latest_round_type,
+    ir.result       AS latest_round_result
+FROM APPLICATION a
+JOIN STUDENT s       ON a.student_id = s.student_id
+JOIN JOB_ROLE jr     ON a.role_id    = jr.role_id
+JOIN COMPANY c       ON jr.company_id = c.company_id
+LEFT JOIN INTERVIEW_ROUND ir
+    ON ir.app_id = a.app_id
+    AND ir.round_no = (
+        SELECT MAX(round_no) FROM INTERVIEW_ROUND
+        WHERE app_id = a.app_id
+    );
 
+-- VIEW 3: Shortlist view per role (for company use)
+CREATE VIEW shortlist_view AS
+SELECT
+    jr.title        AS role_title,
+    c.name          AS company_name,
+    s.name          AS student_name,
+    s.roll_no,
+    s.branch,
+    s.cpi,
+    a.status
+FROM APPLICATION a
+JOIN STUDENT s   ON a.student_id = s.student_id
+JOIN JOB_ROLE jr ON a.role_id    = jr.role_id
+JOIN COMPANY c   ON jr.company_id = c.company_id
+WHERE a.status IN ('shortlisted', 'offered')
+ORDER BY jr.role_id, s.cpi DESC;
 
--- Insert sample data
-INSERT INTO category (category_name) VALUES ('Fiction'), ('Science'), ('History'), ('Technology'), ('Philosophy'), ('Mathematics'), ('Psychology'), ('Engineering'), ('Medicine'), ('Art'), ('Biography'), ('Politics'), ('Economics'), ('Education'), ('Environment');
+-- VIEW 4: Company-wise offer stats
+CREATE VIEW company_stats AS
+SELECT
+    c.name                                        AS company_name,
+    c.sector,
+    COUNT(DISTINCT jr.role_id)                    AS total_roles,
+    COUNT(o.offer_id)                             AS total_offers,
+    SUM(CASE WHEN o.acceptance_status = 'accepted'
+             THEN 1 ELSE 0 END)                   AS accepted_offers,
+    ROUND(AVG(o.package_offered), 2)              AS avg_package_offered
+FROM COMPANY c
+LEFT JOIN JOB_ROLE jr ON c.company_id    = jr.company_id
+LEFT JOIN OFFER o     ON jr.role_id      = o.role_id
+GROUP BY c.company_id, c.name, c.sector;
 
-INSERT INTO publisher (publisher_name, publication_language) VALUES ('Penguin', 'English'), ('Springer', 'English'), ('Oxford Press', 'English'), ('HarperCollins', 'English'), ('Cambridge University Press', 'English'), ('McGraw Hill', 'English'), ('Pearson', 'English'), ('MIT Press', 'English'), ('Elsevier', 'English'), ('Routledge', 'English'), ('Bloomsbury', 'English'),
-('Thames & Hudson', 'English'), ('Vintage', 'English'), ('Hachette', 'English'), ('Basic Books', 'English');
+-- ── SEED DATA ───────────────────────────────────────────────
 
-INSERT INTO location (floor_no, shelf_no) VALUES (1, 5), (2, 10), (3, 15), (1, 3), (2, 7), (3, 1), (1, 9), (2, 4), (3, 8), (1, 6), (4, 2), (4, 5), (4, 8), (5, 1), (5, 3);
+INSERT INTO STUDENT (roll_no, name, branch, cpi, grad_year, eligible) VALUES
+('22B0101', 'Aarav Sharma',     'CSE', 9.20, 2026, TRUE),
+('22B0102', 'Priya Mehta',      'CSE', 8.75, 2026, TRUE),
+('22B0103', 'Rohan Gupta',      'EE',  7.90, 2026, TRUE),
+('22B0104', 'Sneha Iyer',       'ME',  8.10, 2026, TRUE),
+('22B0105', 'Karan Patel',      'CSE', 9.50, 2026, TRUE),
+('22B0106', 'Ananya Singh',     'EE',  7.60, 2026, TRUE),
+('22B0107', 'Vikram Nair',      'CSE', 8.30, 2026, TRUE),
+('22B0108', 'Pooja Reddy',      'CE',  7.80, 2026, TRUE),
+('22B0109', 'Arjun Verma',      'CSE', 9.10, 2026, TRUE),
+('22B0110', 'Meera Joshi',      'ME',  8.60, 2026, TRUE),
+('22B0111', 'Dev Agarwal',      'CSE', 7.20, 2026, TRUE),
+('22B0112', 'Tanvi Sharma',     'EE',  8.90, 2026, TRUE),
+('22B0113', 'Rahul Khanna',     'CSE', 9.30, 2026, TRUE),
+('22B0114', 'Ishita Bose',      'CE',  7.60, 2026, TRUE),
+('22B0115', 'Nikhil Soni',      'ME',  8.40, 2026, TRUE),
+('22B0116', 'Divya Pillai',     'CSE', 8.00, 2026, TRUE),
+('22B0117', 'Aditya Kumar',     'EE',  7.55, 2026, TRUE),
+('22B0118', 'Shreya Tiwari',    'CSE', 9.70, 2026, TRUE),
+('22B0119', 'Manish Dubey',     'CE',  7.30, 2026, TRUE),
+('22B0120', 'Kavya Menon',      'CSE', 8.85, 2026, TRUE);
 
-INSERT INTO author (author_name) VALUES ('J.K. Rowling'), ('Stephen Hawking'), ('Yuval Noah Harari'), ('Isaac Newton'), ('Albert Einstein'), ('Sigmund Freud'), ('Marie Curie'), ('Leonardo da Vinci'), ('Charles Darwin'), ('Carl Sagan'), ('Malcolm Gladwell'), ('Noam Chomsky'), ('Barack Obama'), ('Elon Musk'), ('Jane Austen');
+INSERT INTO COMPANY (name, sector, hr_contact, min_cpi) VALUES
+('Google',         'Tech',    'hr@google.com',       8.50),
+('Microsoft',      'Tech',    'hr@microsoft.com',    7.50),
+('Goldman Sachs',  'Finance', 'hr@gs.com',           8.00),
+('Tata Steel',     'Core',    'hr@tatasteel.com',    6.50),
+('Amazon',         'Tech',    'hr@amazon.com',       7.00),
+('McKinsey',       'Consult', 'hr@mckinsey.com',     8.50),
+('Samsung R&D',    'Tech',    'hr@samsung.com',      7.50),
+('DE Shaw',        'Finance', 'hr@deshaw.com',       8.00);
 
-INSERT INTO book (book_title, category_id, publisher_id, publication_year, location_id, copies_total, copies_available) VALUES 
-('Harry Potter', 1, 1, 1997, 1, 10, 8),
-('A Brief History of Time', 2, 2, 1988, 2, 5, 3),
-('Sapiens', 3, 3, 2011, 3, 7, 6),
-('Principia Mathematica', 6, 5, 1687, 4, 3, 3),
-('Relativity: The Special and General Theory', 2, 5, 1916, 5, 4, 2),
-('The Interpretation of Dreams', 7, 6, 1900, 6, 5, 4),
-('On the Origin of Species', 3, 7, 1859, 7, 6, 5),
-('Cosmos', 2, 8, 1980, 8, 7, 6),
-('The Art of War', 10, 9, -500, 9, 4, 4),
-('The Double Helix', 8, 10, 1968, 10, 5, 3),
-('Outliers', 11, 11, 2008, 11, 6, 5),
-('Who Rules the World?', 12, 12, 2016, 12, 4, 4),
-('The Audacity of Hope', 11, 13, 2006, 13, 5, 3),
-('Tesla: Inventing the Future', 8, 14, 2015, 14, 7, 6),
-('Pride and Prejudice', 1, 15, 1813, 15, 10, 9);
+INSERT INTO JOB_ROLE (company_id, title, package_lpa, location, openings) VALUES
+(1, 'SWE',                  45.00, 'Bangalore',  2),
+(1, 'SWE Intern + FTE',     40.00, 'Hyderabad',  1),
+(2, 'SDE-1',                35.00, 'Hyderabad',  3),
+(2, 'PM',                   30.00, 'Bangalore',  1),
+(3, 'Analyst',              28.00, 'Mumbai',     2),
+(3, 'Quant',                35.00, 'Mumbai',     1),
+(4, 'Graduate Engineer',    12.00, 'Jamshedpur', 4),
+(5, 'SDE-1',                32.00, 'Bangalore',  3),
+(5, 'Data Engineer',        28.00, 'Hyderabad',  2),
+(6, 'Business Analyst',     26.00, 'Delhi',      2),
+(7, 'R&D Engineer',         18.00, 'Noida',      3),
+(8, 'Quant Researcher',     50.00, 'Hyderabad',  2);
 
-INSERT INTO book_author (book_id, author_id) VALUES (1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (6, 6), (7, 9), (8, 10), (9, 8), (10, 7), (11, 11), (12, 12), (13, 13), (14, 14), (15, 15);
+INSERT INTO APPLICATION (student_id, role_id, status, applied_date) VALUES
+(1,  1,  'shortlisted', '2026-01-10'),
+(1,  8,  'applied',     '2026-01-12'),
+(2,  3,  'shortlisted', '2026-01-10'),
+(2,  5,  'applied',     '2026-01-11'),
+(3,  3,  'applied',     '2026-01-10'),
+(3,  7,  'applied',     '2026-01-13'),
+(4,  7,  'applied',     '2026-01-10'),
+(4,  11, 'applied',     '2026-01-14'),
+(5,  1,  'offered',     '2026-01-10'),
+(5,  12, 'shortlisted', '2026-01-11'),
+(6,  11, 'applied',     '2026-01-10'),
+(7,  3,  'shortlisted', '2026-01-10'),
+(7,  8,  'applied',     '2026-01-12'),
+(8,  7,  'applied',     '2026-01-10'),
+(9,  1,  'shortlisted', '2026-01-10'),
+(9,  12, 'applied',     '2026-01-11'),
+(10, 5,  'applied',     '2026-01-11'),
+(11, 8,  'applied',     '2026-01-12'),
+(12, 6,  'shortlisted', '2026-01-10'),
+(13, 1,  'shortlisted', '2026-01-10'),
+(13, 12, 'shortlisted', '2026-01-11'),
+(14, 7,  'applied',     '2026-01-13'),
+(15, 11, 'applied',     '2026-01-14'),
+(16, 3,  'applied',     '2026-01-10'),
+(17, 11, 'applied',     '2026-01-14'),
+(18, 1,  'offered',     '2026-01-10'),
+(18, 12, 'shortlisted', '2026-01-11'),
+(19, 7,  'applied',     '2026-01-13'),
+(20, 3,  'shortlisted', '2026-01-10'),
+(20, 8,  'applied',     '2026-01-12');
 
-INSERT INTO user (name, email, password, mobile_no) VALUES 
-('Alice', 'alice@example.com', 'password123', '1234567890'),
-('Bob', 'bob@example.com', 'securepass', '0987654321'),
-('Charlie', 'charlie@example.com', 'charliepass', '1112233445'),
-('David', 'david@example.com', 'davidpass', '5566778899'),
-('Emma', 'emma@example.com', 'emmapass', '6677889900'),
-('Frank', 'frank@example.com', 'frankpass', '1122334455'),
-('Grace', 'grace@example.com', 'gracepass', '9988776655'),
-('Hank', 'hank@example.com', 'hankpass', '2233445566'),
-('Ivy', 'ivy@example.com', 'ivypass', '3344556677'),
-('Jack', 'jack@example.com', 'jackpass', '4455667788');
+INSERT INTO INTERVIEW_ROUND (app_id, round_no, round_type, result, round_date) VALUES
+(1,  1, 'Online Assessment', 'pass', '2026-01-15'),
+(1,  2, 'Technical',         'pass', '2026-01-20'),
+(3,  1, 'Online Assessment', 'pass', '2026-01-15'),
+(3,  2, 'Technical',         'pass', '2026-01-20'),
+(9,  1, 'Online Assessment', 'pass', '2026-01-15'),
+(9,  2, 'Technical',         'pass', '2026-01-18'),
+(9,  3, 'HR',                'pass', '2026-01-22'),
+(10, 1, 'Online Assessment', 'pass', '2026-01-16'),
+(12, 1, 'Online Assessment', 'pass', '2026-01-15'),
+(12, 2, 'Technical',         'pass', '2026-01-19'),
+(15, 1, 'Online Assessment', 'pass', '2026-01-15'),
+(15, 2, 'Technical',         'pass', '2026-01-20'),
+(19, 1, 'Online Assessment', 'pass', '2026-01-15'),
+(19, 2, 'Technical',         'pass', '2026-01-19'),
+(21, 1, 'Online Assessment', 'pass', '2026-01-16'),
+(26, 1, 'Online Assessment', 'pass', '2026-01-15'),
+(26, 2, 'Technical',         'pass', '2026-01-18'),
+(26, 3, 'HR',                'pass', '2026-01-22'),
+(29, 1, 'Online Assessment', 'pass', '2026-01-15'),
+(29, 2, 'Technical',         'pass', '2026-01-20');
 
-INSERT INTO book_issue (user_id, book_id, issue_date, return_date) VALUES (1, 1, '2025-03-01', '2025-03-10'), (2, 2, '2025-03-05', '2025-03-15'), (3, 4, '2025-03-10', '2025-03-20'), (4, 5, '2025-03-12', '2025-03-22');
-
-INSERT INTO book_request (user_id, book_id, request_date) VALUES (2,4,'2025-03-16'),(4,4,'2025-03-15'),(8,2,'2025-03-20'),(1,2,'2025-03-17');
-
-INSERT INTO manager (name, email, password, mobile_no) VALUES 
-('Abc', 'abc_man@example.com', '234', '1234567890');
+INSERT INTO OFFER (student_id, role_id, package_offered, acceptance_status, offer_date) VALUES
+(5,  1, 45.00, 'accepted', '2026-01-25'),
+(18, 1, 45.00, 'pending',  '2026-01-25');

@@ -1,14 +1,20 @@
 import express from 'express';
-import dotenv from 'dotenv'
-dotenv.config();
-import user from "./routes/user.js";
-import book from "./routes/book.js";
+import dotenv from 'dotenv';
 import db from "./db/connection.js";
-import manager from "./routes/manager.js";
+import cors from 'cors';
+// Your new Placement Portal routes
+import student from "./routes/student.js";
+import company from "./routes/company.js";
+import application from "./routes/application.js";
+import offer from "./routes/offer.js";
 
+dotenv.config();
 const app = express();
-const Port = process.env.PORT || 8080;
+app.use(cors());
+const Port = process.env.PORT || 5000;
+
 app.use(express.json());
+
 // Test database connection and start server
 db.getConnection()
     .then(connection => {
@@ -22,39 +28,9 @@ db.getConnection()
         console.error('Database connection failed:', err);
         process.exit(1);
     });
-// Middleware to parse JSON request bodies
 
-
-app.use('/user',user);
-
-app.use('/book', book);
-
-app.use('/manager', manager);
-
-
-
-
-
-
-
-
-
-
-
-
-
-//Just to test whether database is working properly.
-app.get('/users', async (req, res) => {
-    try {
-        const [rows] = await db.query("SELECT name,email FROM user");
-        res.json(rows);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Error retrieving users' });
-    }
-});
-
-
-
-
-
+// Use the routes
+app.use('/student', student);
+app.use('/company', company);
+app.use('/application', application);
+app.use('/offer', offer);
