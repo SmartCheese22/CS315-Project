@@ -1,12 +1,16 @@
-import mysql from 'mysql2';
+import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
 dotenv.config();
-// Create a MySQL pool connection
+
 const db = mysql.createPool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASS,
-    database: process.env.DB_NAME
-}).promise();
+    host:     process.env.DB_HOST,
+    user:     process.env.DB_USER,
+    password: process.env.DB_PASSWORD,   // was DB_PASS — fixed!
+    database: process.env.DB_NAME,
+    port:     process.env.DB_PORT,       // was missing!
+    waitForConnections: true,
+    connectionLimit: 10,
+    ssl: { rejectUnauthorized: false }   // required for Aiven!
+});
 
 export default db;
