@@ -1,43 +1,23 @@
-const otpStore = new Map(); // Temporary OTP store (Use Redis in production)
-import nodemailer from 'nodemailer';
+import { sendMail } from './mailer.js';
 
-// Configure email transporter
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL,   
-      pass: process.env.EMAIL_PASSWORD,      
-    },
-  });
+const otpStore = new Map(); // Temporary in-memory OTP store
 
-// Generate and send OTP
-async function sendOTP(email) {
+export async function sendOTP(email) {
     const otp = Math.floor(100000 + Math.random() * 900000); // 6-digit OTP
-    otpStore.set(email, otp);
+    otpStore.set(email, otp.toString());
 
-    const mailOptions = {
-        from: process.env.EMAIL,
+    const success = await sendMail({
         to: email,
-        subject: 'Your OTP Code',
-        text: `Your OTP for registration is: ${otp}`,
-    };
-
-    try {
-        await transporter.sendMail(mailOptions);
-        return true;
-    } catch (error) {
-        console.error('Error sending OTP:', error);
-        return false;
-    }
+        subject: '🎓 IITK Placement Portal - Login OTP',
+        text: `Your OTP for login is: ${otp}. Do not share this with anyone.`
+    });
+    return success;
 }
 
-// Verify OTP
-function verifyOTP(email, otp) {
-    if (otpStore.get(email) == otp) {
-        otpStore.delete(email); // Remove OTP after verification
+export function verifyOTP(email, otp) {
+    if (otpStore.get(email) === otp.toString()) {
+        otpStore.delete(email); // Delete after successful use for security
         return true;
     }
     return false;
 }
-
-export { sendOTP, verifyOTP };

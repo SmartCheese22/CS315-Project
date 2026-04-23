@@ -3,7 +3,7 @@
 -- data.sql : schema + triggers + views + seed data
 -- ============================================================
 
-USE placement_portal;
+USE defaultdb;
 
 -- ── TABLES ──────────────────────────────────────────────────
 
@@ -11,6 +11,7 @@ CREATE TABLE STUDENT (
     student_id   INT AUTO_INCREMENT PRIMARY KEY,
     roll_no      VARCHAR(20) UNIQUE NOT NULL,
     name         VARCHAR(100) NOT NULL,
+    email        VARCHAR(100) UNIQUE NOT NULL,
     branch       VARCHAR(50) NOT NULL,
     cpi          DECIMAL(4,2) NOT NULL,
     grad_year    INT NOT NULL,
@@ -230,27 +231,29 @@ GROUP BY c.company_id, c.name, c.sector;
 
 -- ── SEED DATA ───────────────────────────────────────────────
 
-INSERT INTO STUDENT (roll_no, name, branch, cpi, grad_year, eligible) VALUES
-('22B0101', 'Aarav Sharma',     'CSE', 9.20, 2026, TRUE),
-('22B0102', 'Priya Mehta',      'CSE', 8.75, 2026, TRUE),
-('22B0103', 'Rohan Gupta',      'EE',  7.90, 2026, TRUE),
-('22B0104', 'Sneha Iyer',       'ME',  8.10, 2026, TRUE),
-('22B0105', 'Karan Patel',      'CSE', 9.50, 2026, TRUE),
-('22B0106', 'Ananya Singh',     'EE',  7.60, 2026, TRUE),
-('22B0107', 'Vikram Nair',      'CSE', 8.30, 2026, TRUE),
-('22B0108', 'Pooja Reddy',      'CE',  7.80, 2026, TRUE),
-('22B0109', 'Arjun Verma',      'CSE', 9.10, 2026, TRUE),
-('22B0110', 'Meera Joshi',      'ME',  8.60, 2026, TRUE),
-('22B0111', 'Dev Agarwal',      'CSE', 7.20, 2026, TRUE),
-('22B0112', 'Tanvi Sharma',     'EE',  8.90, 2026, TRUE),
-('22B0113', 'Rahul Khanna',     'CSE', 9.30, 2026, TRUE),
-('22B0114', 'Ishita Bose',      'CE',  7.60, 2026, TRUE),
-('22B0115', 'Nikhil Soni',      'ME',  8.40, 2026, TRUE),
-('22B0116', 'Divya Pillai',     'CSE', 8.00, 2026, TRUE),
-('22B0117', 'Aditya Kumar',     'EE',  7.55, 2026, TRUE),
-('22B0118', 'Shreya Tiwari',    'CSE', 9.70, 2026, TRUE),
-('22B0119', 'Manish Dubey',     'CE',  7.30, 2026, TRUE),
-('22B0120', 'Kavya Menon',      'CSE', 8.85, 2026, TRUE);
+INSERT INTO STUDENT (roll_no, name, email, branch, cpi, grad_year, eligible) VALUES
+('22B0101', 'Aarav Sharma',     '22B0101@iitk.ac.in', 'CSE', 9.20, 2026, TRUE),
+('22B0102', 'Priya Mehta',      '22B0102@iitk.ac.in', 'CSE', 8.75, 2026, TRUE),
+('22B0103', 'Rohan Gupta',      '22B0103@iitk.ac.in', 'EE',  7.90, 2026, TRUE),
+('22B0104', 'Sneha Iyer',       '22B0104@iitk.ac.in', 'ME',  8.10, 2026, TRUE),
+('22B0105', 'Karan Patel',      '22B0105@iitk.ac.in', 'CSE', 9.50, 2026, TRUE),
+('22B0106', 'Ananya Singh',     '22B0106@iitk.ac.in', 'EE',  7.60, 2026, TRUE),
+('22B0107', 'Vikram Nair',      '22B0107@iitk.ac.in', 'CSE', 8.30, 2026, TRUE),
+('22B0108', 'Pooja Reddy',      '22B0108@iitk.ac.in', 'CE',  7.80, 2026, TRUE),
+('22B0109', 'Arjun Verma',      '22B0109@iitk.ac.in', 'CSE', 9.10, 2026, TRUE),
+('22B0110', 'Meera Joshi',      '22B0110@iitk.ac.in', 'ME',  8.60, 2026, TRUE),
+('22B0111', 'Dev Agarwal',      '22B0111@iitk.ac.in', 'CSE', 7.20, 2026, TRUE),
+('22B0112', 'Tanvi Sharma',     '22B0112@iitk.ac.in', 'EE',  8.90, 2026, TRUE),
+('22B0113', 'Rahul Khanna',     '22B0113@iitk.ac.in', 'CSE', 9.30, 2026, TRUE),
+('22B0114', 'Ishita Bose',      '22B0114@iitk.ac.in', 'CE',  7.60, 2026, TRUE),
+('22B0115', 'Nikhil Soni',      '22B0115@iitk.ac.in', 'ME',  8.40, 2026, TRUE),
+('22B0116', 'Divya Pillai',     '22B0116@iitk.ac.in', 'CSE', 8.00, 2026, TRUE),
+('22B0117', 'Aditya Kumar',     '22B0117@iitk.ac.in', 'EE',  7.55, 2026, TRUE),
+('22B0118', 'Shreya Tiwari',    '22B0118@iitk.ac.in', 'CSE', 9.70, 2026, TRUE),
+('22B0119', 'Manish Dubey',     '22B0119@iitk.ac.in', 'CE',  7.30, 2026, TRUE),
+('22B0120', 'Kavya Menon',      '22B0120@iitk.ac.in', 'CSE', 8.85, 2026, TRUE),
+-- THE HOST USER (student_id = 21)
+('22ADMIN', 'Prathamesh',       'smartcheese176@gmail.com', 'CSE', 9.99, 2026, TRUE);
 
 INSERT INTO COMPANY (name, sector, hr_contact, min_cpi) VALUES
 ('Google',         'Tech',    'hr@google.com',       8.50),
@@ -306,7 +309,9 @@ INSERT INTO APPLICATION (student_id, role_id, status, applied_date) VALUES
 (18, 12, 'shortlisted', '2026-01-11'),
 (19, 7,  'applied',     '2026-01-13'),
 (20, 3,  'shortlisted', '2026-01-10'),
-(20, 8,  'applied',     '2026-01-12');
+(20, 8,  'applied',     '2026-01-12'),
+(21, 1,  'offered',     '2026-01-10'), -- Google --
+(21, 12, 'shortlisted', '2026-01-11'); -- DE Shaw (This will get rejected when you accept Google)
 
 INSERT INTO INTERVIEW_ROUND (app_id, round_no, round_type, result, round_date) VALUES
 (1,  1, 'Online Assessment', 'pass', '2026-01-15'),
@@ -332,4 +337,5 @@ INSERT INTO INTERVIEW_ROUND (app_id, round_no, round_type, result, round_date) V
 
 INSERT INTO OFFER (student_id, role_id, package_offered, acceptance_status, offer_date) VALUES
 (5,  1, 45.00, 'accepted', '2026-01-25'),
-(18, 1, 45.00, 'pending',  '2026-01-25');
+(18, 1, 45.00, 'pending',  '2026-01-25'),
+(21, 1, 45.00, 'pending',  '2026-01-26');

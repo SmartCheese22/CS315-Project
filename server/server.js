@@ -1,36 +1,44 @@
 import express from 'express';
 import dotenv from 'dotenv';
-import db from "./db/connection.js";
 import cors from 'cors';
-// Your new Placement Portal routes
-import student from "./routes/student.js";
-import company from "./routes/company.js";
-import application from "./routes/application.js";
-import offer from "./routes/offer.js";
+import db from './db/connection.js';
+
+import student     from './routes/student.js';
+import company     from './routes/company.js';
+import application from './routes/application.js';
+import interview   from './routes/interview.js';
+import offer       from './routes/offer.js';
+import auth        from './routes/auth.js'
 
 dotenv.config();
-const app = express();
-app.use(cors());
-const Port = process.env.PORT || 5000;
 
+const app  = express();
+const PORT = process.env.PORT || 5000;
+
+app.use(cors());
 app.use(express.json());
 
-// Test database connection and start server
+// Health check
+app.get('/', (req, res) => res.json({ message: 'Placement Portal API running' }));
+
+// Routes
+app.use('/student',     student);
+app.use('/company',     company);
+app.use('/application', application);
+app.use('/interview',   interview);
+app.use('/offer',       offer);
+app.use('/auth', auth)
+
+// Test DB then start
 db.getConnection()
-    .then(connection => {
-        console.log('Database connected successfully');
-        connection.release();
-        app.listen(Port, () => {
-            console.log(`Server running on port http://localhost:${Port}`);
+    .then(conn => {
+        console.log('✅ MySQL connected — placement_portal');
+        conn.release();
+        app.listen(PORT, () => {
+            console.log(`🚀 Server running at http://localhost:${PORT}`);
         });
     })
     .catch(err => {
-        console.error('Database connection failed:', err);
+        console.error('❌ DB connection failed:', err.message);
         process.exit(1);
     });
-
-// Use the routes
-app.use('/student', student);
-app.use('/company', company);
-app.use('/application', application);
-app.use('/offer', offer);
