@@ -3,9 +3,21 @@
 -- data.sql : schema + triggers + views + stored procedure + seed data
 -- ============================================================
 
-CREATE DATABASE IF NOT EXISTS placement_portal;
-USE placement_portal;
+-- CREATE DATABASE IF NOT EXISTS placement_portal;
+USE defaultdb;
 
+-- Drop everything first
+DROP VIEW IF EXISTS placement_dashboard;
+DROP VIEW IF EXISTS application_tracker;
+DROP VIEW IF EXISTS shortlist_view;
+DROP VIEW IF EXISTS company_stats;
+
+DROP TABLE IF EXISTS OFFER;
+DROP TABLE IF EXISTS INTERVIEW_ROUND;
+DROP TABLE IF EXISTS APPLICATION;
+DROP TABLE IF EXISTS JOB_ROLE;
+DROP TABLE IF EXISTS COMPANY;
+DROP TABLE IF EXISTS STUDENT;
 -- ── TABLES ──────────────────────────────────────────────────
 
 CREATE TABLE STUDENT (
