@@ -130,4 +130,22 @@ router.put('/:offer_id/decline', async (req, res) => {
     }
 });
 
+// GET offers for a specific student only (for student dashboard)
+router.get('/my/:student_id', async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT o.offer_id, o.acceptance_status, o.package_offered, o.offer_date,
+                   c.name AS company, jr.title AS role
+            FROM OFFER o
+            JOIN JOB_ROLE jr ON o.role_id = jr.role_id
+            JOIN COMPANY c ON jr.company_id = c.company_id
+            WHERE o.student_id = ?
+            ORDER BY o.offer_date DESC
+        `, [req.params.student_id]);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 export default router;

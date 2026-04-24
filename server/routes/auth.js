@@ -4,28 +4,37 @@ import { sendOTP, verifyOTP } from '../utils/otpService.js';
 
 const router = express.Router();
 
-// 1. Send OTP
+const ADMIN_EMAIL = 'smartcheese176@gmail.com'; // your email = admin
+
+// 1. Send OTP — works for both admin and students
 router.post('/send-otp', async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email is required' });
 
     try {
+        // Check if it's the admin
+        if (email === ADMIN_EMAIL) {
+            const otpSent = await sendOTP(email);
+            if (!otpSent) return res.status(500).json({ error: 'Failed to send OTP. Check Gmail App Password.' });
+            return res.status(200).json({ message: 'OTP sent to admin email' });
+        }
+
+        // Otherwise check student table
         const [student] = await db.query('SELECT * FROM STUDENT WHERE email = ?', [email]);
         if (student.length === 0) {
             return res.status(404).json({ error: 'No student found with this email.' });
         }
 
         const otpSent = await sendOTP(email);
-        if (!otpSent) return res.status(500).json({ error: 'Failed to send OTP email. Check Gmail App Password.' });
+        if (!otpSent) return res.status(500).json({ error: 'Failed to send OTP. Check Gmail App Password.' });
 
-        console.log(`📩 OTP successfully sent to ${email}`);
-        res.status(200).json({ message: 'OTP sent successfully to ' + email });
+        res.status(200).json({ message: 'OTP sent to ' + email });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// 2. Verify OTP & Login
+// 2. Verify OTP & return user info + role
 router.post('/verify-otp', async (req, res) => {
     const { email, otp } = req.body;
     if (!email || !otp) return res.status(400).json({ error: 'Email and OTP are required' });
@@ -34,10 +43,23 @@ router.post('/verify-otp', async (req, res) => {
         const isValid = verifyOTP(email, otp);
         if (!isValid) return res.status(400).json({ error: 'Invalid or expired OTP' });
 
-        const [student] = await db.query('SELECT student_id, roll_no, name, branch, cpi, email FROM STUDENT WHERE email = ?', [email]);
-        
-        console.log(`🔐 System Auth: ${student[0].name} logged in successfully via OTP.`);
-        res.status(200).json({ message: 'Login successful', user: student[0] });
+        // Admin login
+        if (email === ADMIN_EMAIL) {
+            return res.status(200).json({
+                message: 'Admin login successful',
+                user: { name: 'Admin', email: ADMIN_EMAIL, role: 'admin' }
+            });
+        }
+
+        // Student login
+        const [rows] = await db.query(
+            'SELECT student_id, roll_no, name, branch, cpi, email, eligible FROM STUDENT WHERE email = ?',
+            [email]
+        );
+        res.status(200).json({
+            message: 'Login successful',
+            user: { ...rows[0], role: 'student' }
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
