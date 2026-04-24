@@ -25,12 +25,37 @@ router.get('/', async (req, res) => {
 });
 
 // POST create a new offer for a student
+// POST create a new offer for a student
 router.post('/', async (req, res) => {
     try {
         const { student_id, role_id, package_offered } = req.body;
         if (!student_id || !role_id || !package_offered) {
             return res.status(400).json({ error: 'student_id, role_id and package_offered are required' });
         }
+
+        // Check application exists
+        const [[app]] = await db.query(
+            'SELECT status FROM APPLICATION WHERE student_id = ? AND role_id = ?',
+            [student_id, role_id]
+        );
+        if (!app) {
+            return res.status(400).json({ error: 'Student has no application for this role' });
+        }
+
+        // Block rejected applicants
+        if (app.status === 'rejected') {
+            return res.status(400).json({ error: 'Cannot create offer for a rejected applicant' });
+        }
+
+        // Block duplicate offers
+        const [[existing]] = await db.query(
+            'SELECT offer_id FROM OFFER WHERE student_id = ? AND role_id = ?',
+            [student_id, role_id]
+        );
+        if (existing) {
+            return res.status(400).json({ error: 'An offer already exists for this student and role' });
+        }
+
         const today = new Date().toISOString().slice(0, 10);
         const [result] = await db.query(
             'INSERT INTO OFFER (student_id, role_id, package_offered, offer_date) VALUES (?, ?, ?, ?)',

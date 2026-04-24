@@ -1017,6 +1017,9 @@ async function createOffer() {
     toast('Please fill in all fields', 'error');
     return;
   }
+  const btn = document.querySelector('#new-offer-modal .btn-primary');
+  btn.disabled = true;
+  btn.textContent = 'Creating...';
   try {
     await api('/offer', {
       method: 'POST',
@@ -1025,7 +1028,13 @@ async function createOffer() {
     closeModal('new-offer-modal');
     toast('Offer created', 'success');
     loadOffers();
-  } catch(e) { toast(e.message, 'error'); }
+  } catch(e) {
+    toast(e.message, 'error'); 
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Create Offer';
+  }
+
 }
 
 // ══════════ ADMIN — TRACKER ══════════
