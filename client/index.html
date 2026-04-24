@@ -1136,10 +1136,51 @@ async function loadOpenRoles(){
   try{
     const roles=await api('/company/roles/open');
     document.getElementById('open-roles-table').innerHTML=roles.length?`
-      <table><thead><tr><th>Company</th><th>Sector</th><th>Role</th><th>Package</th><th>Location</th><th>Openings</th><th>Min CPI</th></tr></thead>
-      <tbody>${roles.map(r=>`<tr><td><strong>${r.company_name}</strong></td><td>${sectorPill(r.sector)}</td><td>${r.title}</td><td class="mono" style="color:var(--accent)">${r.package_lpa} LPA</td><td class="muted-cell">${r.location||'—'}</td><td class="mono">${r.openings}</td><td class="mono" style="color:${currentUser.cpi>=r.min_cpi?'var(--green)':'var(--red)'}">${r.min_cpi} ${currentUser.cpi>=r.min_cpi?'✓':'✗'}</td></tr>`).join('')}</tbody></table>`:
+      <table><thead><tr><th>Company</th><th>Sector</th><th>Role</th><th>Package</th><th>Location</th><th>Openings</th><th>Min CPI</th><th>Action</th></tr></thead>
+      <tbody>${roles.map(r=>{
+        const eligible = currentUser.cpi >= r.min_cpi;
+        return `<tr>
+          <td><strong>${r.company_name}</strong></td>
+          <td>${sectorPill(r.sector)}</td>
+          <td>${r.title}</td>
+          <td class="mono" style="color:var(--accent)">${r.package_lpa} LPA</td>
+          <td class="muted-cell">${r.location||'—'}</td>
+          <td class="mono">${r.openings}</td>
+          <td class="mono" style="color:${eligible?'var(--green)':'var(--red)'}">${r.min_cpi} ${eligible?'✓':'✗'}</td>
+          <td>
+            ${eligible
+              ? `<button class="btn btn-primary btn-sm" onclick="studentApply(${r.role_id}, this)">Apply</button>`
+              : `<span style="font-size:10px;color:var(--muted)">CPI too low</span>`
+            }
+          </td>
+        </tr>`;
+      }).join('')}</tbody></table>`:
       '<div class="empty"><div class="empty-icon">◎</div><div class="empty-text">No open roles right now</div></div>';
   } catch(e){toast(e.message,'error');}
+}
+
+async function studentApply(role_id, btn) {
+  if(!confirm('Submit application for this role? The CPI trigger will be checked.')) return;
+  btn.disabled = true;
+  btn.textContent = 'Applying...';
+  try {
+    await api('/application', {
+      method: 'POST',
+      body: JSON.stringify({
+        student_id: currentUser.student_id,
+        role_id: role_id
+      })
+    });
+    toast('Application submitted! ✓', 'success');
+    btn.textContent = 'Applied';
+    btn.className = 'btn btn-outline btn-sm';
+    // Refresh dashboard to show new application
+    loadMyDashboard();
+  } catch(e) {
+    toast(e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Apply';
+  }
 }
 
 // ── MODAL OPENERS WITH POPULATION ──
