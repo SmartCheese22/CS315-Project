@@ -1090,7 +1090,8 @@ async function runQuery(i){
 
 // ══════════ STUDENT PAGES ══════════
 async function loadMyDashboard(){
-  const u=currentUser;
+  const fresh = await api(`/student/${currentUser.roll_no}`);
+  const u = { ...currentUser, ...fresh };
   document.getElementById('sw-name').textContent=`Welcome, ${u.name.split(' ')[0]} 👋`;
   document.getElementById('sw-meta').textContent=`${u.roll_no} · ${u.branch} · CPI ${u.cpi} · ${u.eligible?'Eligible for placements':'Placed ✓'}`;
   document.getElementById('sw-stats').innerHTML=`
