@@ -492,11 +492,33 @@ tbody td{padding:11px 16px;font-size:12px;color:var(--text);white-space:nowrap;}
 
 <div class="modal-overlay" id="new-offer-modal">
   <div class="modal">
-    <div class="modal-head"><h3>Create Offer</h3><button class="modal-close" onclick="closeModal('new-offer-modal')">✕</button></div>
+    <div class="modal-head">
+      <h3>Create Offer</h3>
+      <button class="modal-close" onclick="closeModal('new-offer-modal')">✕</button>
+    </div>
     <div class="modal-body">
-      <div class="form-group"><label class="form-label">Student</label><select class="form-select" id="offer-student"></select></div>
-      <div class="form-group"><label class="form-label">Job Role</label><select class="form-select" id="offer-role"></select></div>
-      <div class="form-group"><label class="form-label">Package Offered (LPA)</label><input class="form-input" id="offer-pkg" type="number" step="0.01" placeholder="45.00"/></div>
+      <div class="form-group">
+        <label class="form-label">Company</label>
+        <select class="form-select" id="offer-company" onchange="onOfferCompanyChange()">
+          <option value="">— Select Company —</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Job Role</label>
+        <select class="form-select" id="offer-role" onchange="onOfferRoleChange()" disabled>
+          <option value="">— Select Company first —</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Student</label>
+        <select class="form-select" id="offer-student" disabled>
+          <option value="">— Select Role first —</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Package Offered (LPA)</label>
+        <input class="form-input" id="offer-pkg" type="number" step="0.01" placeholder="45.00" disabled/>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('new-offer-modal')">Cancel</button>
@@ -885,15 +907,125 @@ async function loadOffers(){
 async function acceptOffer(id){try{await api(`/offer/${id}/accept`,{method:'PUT'});toast('Offer accepted! Triggers fired 🔥','success');loadOffers();}catch(e){toast(e.message,'error');}}
 async function declineOffer(id){try{await api(`/offer/${id}/decline`,{method:'PUT'});toast('Offer declined','info');loadOffers();}catch(e){toast(e.message,'error');}}
 
-async function populateOfferModal(){
-  const[students,roles]=await Promise.all([api('/student'),api('/company/roles/open')]);
-  document.getElementById('offer-student').innerHTML=students.filter(s=>s.eligible).map(s=>`<option value="${s.student_id}">${s.name} (${s.roll_no})</option>`).join('');
-  document.getElementById('offer-role').innerHTML=roles.map(r=>`<option value="${r.role_id}">${r.company_name} — ${r.title}</option>`).join('');
+// ══════════ OFFER MODAL — cascading dropdowns ══════════
+
+async function populateOfferModal() {
+  // Reset all fields
+  const compSel   = document.getElementById('offer-company');
+  const roleSel   = document.getElementById('offer-role');
+  const stuSel    = document.getElementById('offer-student');
+  const pkgInput  = document.getElementById('offer-pkg');
+
+  roleSel.disabled  = true;
+  stuSel.disabled   = true;
+  pkgInput.disabled = true;
+  roleSel.innerHTML  = '<option value="">— Select Company first —</option>';
+  stuSel.innerHTML   = '<option value="">— Select Role first —</option>';
+  pkgInput.value     = '';
+
+  try {
+    const companies = await api('/company');
+    compSel.innerHTML =
+      '<option value="">— Select Company —</option>' +
+      companies.map(c =>
+        `<option value="${c.company_id}" data-min-cpi="${c.min_cpi}">${c.name} (min CPI: ${c.min_cpi})</option>`
+      ).join('');
+  } catch(e) { toast(e.message, 'error'); }
 }
 
-async function createOffer(){
-  try{await api('/offer',{method:'POST',body:JSON.stringify({student_id:parseInt(document.getElementById('offer-student').value),role_id:parseInt(document.getElementById('offer-role').value),package_offered:parseFloat(document.getElementById('offer-pkg').value)})});
-  closeModal('new-offer-modal');toast('Offer created','success');loadOffers();}catch(e){toast(e.message,'error');}
+async function onOfferCompanyChange() {
+  const compSel  = document.getElementById('offer-company');
+  const roleSel  = document.getElementById('offer-role');
+  const stuSel   = document.getElementById('offer-student');
+  const pkgInput = document.getElementById('offer-pkg');
+
+  const cid = compSel.value;
+  roleSel.disabled  = true;
+  stuSel.disabled   = true;
+  pkgInput.disabled = true;
+  stuSel.innerHTML  = '<option value="">— Select Role first —</option>';
+  pkgInput.value    = '';
+
+  if (!cid) {
+    roleSel.innerHTML = '<option value="">— Select Company first —</option>';
+    return;
+  }
+
+  roleSel.innerHTML = '<option value="">Loading...</option>';
+  try {
+    const roles = await api(`/company/${cid}/roles`);
+    const open  = roles.filter(r => r.is_open);
+    if (!open.length) {
+      roleSel.innerHTML = '<option value="">No open roles for this company</option>';
+      return;
+    }
+    roleSel.innerHTML =
+      '<option value="">— Select Role —</option>' +
+      open.map(r =>
+        `<option value="${r.role_id}" data-pkg="${r.package_lpa}">${r.title} — ${r.package_lpa} LPA (${r.openings} opening${r.openings !== 1 ? 's' : ''})</option>`
+      ).join('');
+    roleSel.disabled = false;
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function onOfferRoleChange() {
+  const roleSel  = document.getElementById('offer-role');
+  const stuSel   = document.getElementById('offer-student');
+  const pkgInput = document.getElementById('offer-pkg');
+
+  const rid = roleSel.value;
+  stuSel.disabled   = true;
+  pkgInput.disabled = true;
+  pkgInput.value    = '';
+
+  if (!rid) {
+    stuSel.innerHTML = '<option value="">— Select Role first —</option>';
+    return;
+  }
+
+  // Auto-fill package from the selected role's data attribute
+  const selectedOpt = roleSel.options[roleSel.selectedIndex];
+  pkgInput.value    = selectedOpt?.dataset?.pkg || '';
+  pkgInput.disabled = false;
+
+  stuSel.innerHTML = '<option value="">Loading applicants...</option>';
+  try {
+    const applicants = await api(`/offer/applicants/${rid}`);
+    if (!applicants.length) {
+      stuSel.innerHTML = '<option value="">No eligible applicants for this role</option>';
+      toast('No applicants with applied/shortlisted status found for this role', 'info');
+      return;
+    }
+    stuSel.innerHTML =
+      '<option value="">— Select Student —</option>' +
+      applicants.map(s =>
+        `<option value="${s.student_id}">${s.name} (${s.roll_no}) — CPI ${s.cpi} · ${s.status}</option>`
+      ).join('');
+    stuSel.disabled = false;
+  } catch(e) {
+    stuSel.innerHTML = '<option value="">Error loading applicants</option>';
+    toast(e.message, 'error');
+  }
+}
+
+async function createOffer() {
+  const student_id = parseInt(document.getElementById('offer-student').value);
+  const role_id    = parseInt(document.getElementById('offer-role').value);
+  const pkg        = parseFloat(document.getElementById('offer-pkg').value);
+
+  if (!student_id || !role_id || !pkg) {
+    toast('Please fill in all fields', 'error');
+    return;
+  }
+  try {
+    await api('/offer', {
+      method: 'POST',
+      body: JSON.stringify({ student_id, role_id, package_offered: pkg })
+    });
+    closeModal('new-offer-modal');
+    toast('Offer created', 'success');
+    loadOffers();
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 // ══════════ ADMIN — TRACKER ══════════
@@ -1001,11 +1133,12 @@ async function loadOpenRoles(){
 }
 
 // ── MODAL OPENERS WITH POPULATION ──
-window.openModal = function(id){
-  if(id==='new-application-modal') populateApplicationModal();
-  if(id==='new-offer-modal') populateOfferModal();
+window.openModal = function(id) {
+  if (id === 'new-application-modal') populateApplicationModal();
+  if (id === 'new-offer-modal') populateOfferModal();          // ← this line stays the same
   document.getElementById(id).classList.add('open');
 };
+
 </script>
 </body>
 </html>

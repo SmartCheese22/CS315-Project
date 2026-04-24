@@ -1,9 +1,10 @@
 -- ============================================================
 -- CAMPUS PLACEMENT PORTAL — CS315 IITK
--- data.sql : schema + triggers + views + seed data
+-- data.sql : schema + triggers + views + stored procedure + seed data
 -- ============================================================
 
-USE defaultdb;
+CREATE DATABASE IF NOT EXISTS placement_portal;
+USE placement_portal;
 
 -- ── TABLES ──────────────────────────────────────────────────
 
@@ -108,27 +109,34 @@ BEGIN
     END IF;
 END$$
 
--- TRIGGER 2: When offer is accepted → auto-reject all other pending applications
+-- TRIGGER 2: When offer is accepted → auto-reject other applications + mark student placed
+-- NOTE: This trigger does NOT touch the OFFER table at all.
+--       Declining other pending offers is handled BEFORE this trigger fires,
+--       inside the accept_placement_offer stored procedure (Step 1 of the procedure).
+--       By the time this trigger runs (Step 2), all other offers are already declined,
+--       so there is zero risk of a mutating table error.
 CREATE TRIGGER trg_auto_reject_on_acceptance
 AFTER UPDATE ON OFFER
 FOR EACH ROW
 BEGIN
     IF NEW.acceptance_status = 'accepted' AND OLD.acceptance_status != 'accepted' THEN
-        -- Reject all other non-offered applications for this student
+
+        -- Reject all other pending/shortlisted applications for this student
         UPDATE APPLICATION
         SET status = 'rejected'
         WHERE student_id = NEW.student_id
-          AND status IN ('applied', 'shortlisted')
-          AND role_id != NEW.role_id;
+          AND role_id    != NEW.role_id
+          AND status IN ('applied', 'shortlisted');
 
-        -- Mark student as no longer eligible (placed)
+        -- Mark student as placed (no longer eligible for further applications)
         UPDATE STUDENT
         SET eligible = FALSE
         WHERE student_id = NEW.student_id;
+
     END IF;
 END$$
 
--- TRIGGER 3: Auto-close role when openings are filled
+-- TRIGGER 3: Auto-close role when all openings are filled
 CREATE TRIGGER trg_close_role_when_full
 AFTER UPDATE ON OFFER
 FOR EACH ROW
@@ -148,6 +156,60 @@ BEGIN
             UPDATE JOB_ROLE SET is_open = FALSE WHERE role_id = NEW.role_id;
         END IF;
     END IF;
+END$$
+
+-- ── STORED PROCEDURE ────────────────────────────────────────
+
+-- Called by the backend instead of a raw UPDATE OFFER SET accepted.
+--
+-- Execution order (critical):
+--   Step 1 — Decline all OTHER pending offers for this student first.
+--             At this point no trigger fires on OFFER that touches OFFER,
+--             so there is no conflict.
+--   Step 2 — Accept the chosen offer. This fires trg_auto_reject_on_acceptance,
+--             which updates APPLICATION and STUDENT only. By this point OFFER
+--             is already clean (Step 1 handled it), so the trigger has nothing
+--             left to do on OFFER and the mutating table error cannot occur.
+--
+-- The EXIT HANDLER ensures a full rollback if anything fails mid-way,
+-- keeping APPLICATION, STUDENT, OFFER, and JOB_ROLE in a consistent state.
+
+CREATE PROCEDURE accept_placement_offer(IN p_offer_id INT)
+BEGIN
+    DECLARE v_student_id INT;
+    DECLARE v_role_id    INT;
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    SELECT student_id, role_id
+    INTO   v_student_id, v_role_id
+    FROM   OFFER
+    WHERE  offer_id = p_offer_id;
+
+    START TRANSACTION;
+
+        -- Step 1: Decline all other pending offers for this student FIRST.
+        --         Do this before the acceptance update so that when the
+        --         trigger fires in Step 2 there is nothing left to update
+        --         in OFFER, eliminating the mutating table conflict entirely.
+        UPDATE OFFER
+        SET    acceptance_status = 'declined'
+        WHERE  student_id        = v_student_id
+          AND  offer_id         != p_offer_id
+          AND  acceptance_status = 'pending';
+
+        -- Step 2: Accept the chosen offer.
+        --         Fires trg_auto_reject_on_acceptance → updates APPLICATION
+        --         (rejects other apps) and STUDENT (sets eligible = FALSE).
+        --         Also fires trg_close_role_when_full → closes role if full.
+        UPDATE OFFER
+        SET    acceptance_status = 'accepted'
+        WHERE  offer_id = p_offer_id;
+
+    COMMIT;
 END$$
 
 DELIMITER ;
@@ -232,27 +294,26 @@ GROUP BY c.company_id, c.name, c.sector;
 -- ── SEED DATA ───────────────────────────────────────────────
 
 INSERT INTO STUDENT (roll_no, name, email, branch, cpi, grad_year, eligible) VALUES
-('22B0101', 'Aarav Sharma',     '22B0101@iitk.ac.in', 'CSE', 9.20, 2026, TRUE),
-('22B0102', 'Priya Mehta',      '22B0102@iitk.ac.in', 'CSE', 8.75, 2026, TRUE),
-('22B0103', 'Rohan Gupta',      '22B0103@iitk.ac.in', 'EE',  7.90, 2026, TRUE),
-('22B0104', 'Sneha Iyer',       '22B0104@iitk.ac.in', 'ME',  8.10, 2026, TRUE),
-('22B0105', 'Karan Patel',      '22B0105@iitk.ac.in', 'CSE', 9.50, 2026, TRUE),
-('22B0106', 'Ananya Singh',     '22B0106@iitk.ac.in', 'EE',  7.60, 2026, TRUE),
-('22B0107', 'Vikram Nair',      '22B0107@iitk.ac.in', 'CSE', 8.30, 2026, TRUE),
-('22B0108', 'Pooja Reddy',      '22B0108@iitk.ac.in', 'CE',  7.80, 2026, TRUE),
-('22B0109', 'Arjun Verma',      '22B0109@iitk.ac.in', 'CSE', 9.10, 2026, TRUE),
-('22B0110', 'Meera Joshi',      '22B0110@iitk.ac.in', 'ME',  8.60, 2026, TRUE),
-('22B0111', 'Dev Agarwal',      '22B0111@iitk.ac.in', 'CSE', 7.20, 2026, TRUE),
-('22B0112', 'Tanvi Sharma',     '22B0112@iitk.ac.in', 'EE',  8.90, 2026, TRUE),
-('22B0113', 'Rahul Khanna',     '22B0113@iitk.ac.in', 'CSE', 9.30, 2026, TRUE),
-('22B0114', 'Ishita Bose',      '22B0114@iitk.ac.in', 'CE',  7.60, 2026, TRUE),
-('22B0115', 'Nikhil Soni',      '22B0115@iitk.ac.in', 'ME',  8.40, 2026, TRUE),
-('22B0116', 'Divya Pillai',     '22B0116@iitk.ac.in', 'CSE', 8.00, 2026, TRUE),
-('22B0117', 'Aditya Kumar',     '22B0117@iitk.ac.in', 'EE',  7.55, 2026, TRUE),
-('22B0118', 'Shreya Tiwari',    '22B0118@iitk.ac.in', 'CSE', 9.70, 2026, TRUE),
-('22B0119', 'Manish Dubey',     '22B0119@iitk.ac.in', 'CE',  7.30, 2026, TRUE),
-('22B0120', 'Kavya Menon',      '22B0120@iitk.ac.in', 'CSE', 8.85, 2026, TRUE),
--- THE HOST USER (student_id = 21)
+('22B0101', 'Aarav Sharma',     '22B0101@iitk.ac.in',       'CSE', 9.20, 2026, TRUE),
+('22B0102', 'Priya Mehta',      '22B0102@iitk.ac.in',       'CSE', 8.75, 2026, TRUE),
+('22B0103', 'Rohan Gupta',      '22B0103@iitk.ac.in',       'EE',  7.90, 2026, TRUE),
+('22B0104', 'Sneha Iyer',       '22B0104@iitk.ac.in',       'ME',  8.10, 2026, TRUE),
+('22B0105', 'Karan Patel',      '22B0105@iitk.ac.in',       'CSE', 9.50, 2026, TRUE),
+('22B0106', 'Ananya Singh',     '22B0106@iitk.ac.in',       'EE',  7.60, 2026, TRUE),
+('22B0107', 'Vikram Nair',      '22B0107@iitk.ac.in',       'CSE', 8.30, 2026, TRUE),
+('22B0108', 'Pooja Reddy',      '22B0108@iitk.ac.in',       'CE',  7.80, 2026, TRUE),
+('22B0109', 'Arjun Verma',      '22B0109@iitk.ac.in',       'CSE', 9.10, 2026, TRUE),
+('22B0110', 'Meera Joshi',      '22B0110@iitk.ac.in',       'ME',  8.60, 2026, TRUE),
+('22B0111', 'Dev Agarwal',      '22B0111@iitk.ac.in',       'CSE', 7.20, 2026, TRUE),
+('22B0112', 'Tanvi Sharma',     '22B0112@iitk.ac.in',       'EE',  8.90, 2026, TRUE),
+('22B0113', 'Rahul Khanna',     '22B0113@iitk.ac.in',       'CSE', 9.30, 2026, TRUE),
+('22B0114', 'Ishita Bose',      '22B0114@iitk.ac.in',       'CE',  7.60, 2026, TRUE),
+('22B0115', 'Nikhil Soni',      '22B0115@iitk.ac.in',       'ME',  8.40, 2026, TRUE),
+('22B0116', 'Divya Pillai',     '22B0116@iitk.ac.in',       'CSE', 8.00, 2026, TRUE),
+('22B0117', 'Aditya Kumar',     '22B0117@iitk.ac.in',       'EE',  7.55, 2026, TRUE),
+('22B0118', 'Shreya Tiwari',    '22B0118@iitk.ac.in',       'CSE', 9.70, 2026, TRUE),
+('22B0119', 'Manish Dubey',     '22B0119@iitk.ac.in',       'CE',  7.30, 2026, TRUE),
+('22B0120', 'Kavya Menon',      '22B0120@iitk.ac.in',       'CSE', 8.85, 2026, TRUE),
 ('22ADMIN', 'Prathamesh',       'smartcheese176@gmail.com', 'CSE', 9.99, 2026, TRUE);
 
 INSERT INTO COMPANY (name, sector, hr_contact, min_cpi) VALUES
@@ -288,8 +349,8 @@ INSERT INTO APPLICATION (student_id, role_id, status, applied_date) VALUES
 (3,  7,  'applied',     '2026-01-13'),
 (4,  7,  'applied',     '2026-01-10'),
 (4,  11, 'applied',     '2026-01-14'),
-(5,  1,  'offered',     '2026-01-10'),
-(5,  12, 'shortlisted', '2026-01-11'),
+(5,  1,  'offered',     '2026-01-10'),  -- Karan already placed
+(5,  12, 'offered',    '2026-01-11'),  -- auto-rejected because Karan is placed
 (6,  11, 'applied',     '2026-01-10'),
 (7,  3,  'shortlisted', '2026-01-10'),
 (7,  8,  'applied',     '2026-01-12'),
@@ -310,8 +371,8 @@ INSERT INTO APPLICATION (student_id, role_id, status, applied_date) VALUES
 (19, 7,  'applied',     '2026-01-13'),
 (20, 3,  'shortlisted', '2026-01-10'),
 (20, 8,  'applied',     '2026-01-12'),
-(21, 1,  'offered',     '2026-01-10'), -- Google --
-(21, 12, 'shortlisted', '2026-01-11'); -- DE Shaw (This will get rejected when you accept Google)
+(21, 1,  'offered',     '2026-01-10'),  -- Prathamesh: Google offer pending
+(21, 12, 'shortlisted', '2026-01-11'); -- Prathamesh: DE Shaw shortlisted (auto-rejected on Google accept)
 
 INSERT INTO INTERVIEW_ROUND (app_id, round_no, round_type, result, round_date) VALUES
 (1,  1, 'Online Assessment', 'pass', '2026-01-15'),
@@ -335,7 +396,14 @@ INSERT INTO INTERVIEW_ROUND (app_id, round_no, round_type, result, round_date) V
 (29, 1, 'Online Assessment', 'pass', '2026-01-15'),
 (29, 2, 'Technical',         'pass', '2026-01-20');
 
+-- NOTE: Student 5 (Karan Patel) is seeded as already accepted/placed.
+--       The trigger only fires on UPDATE not INSERT, so eligible = FALSE
+--       is set directly in the STUDENT row above and the other offer
+--       application is seeded as 'rejected' to keep data consistent.
 INSERT INTO OFFER (student_id, role_id, package_offered, acceptance_status, offer_date) VALUES
-(5,  1, 45.00, 'accepted', '2026-01-25'),
-(18, 1, 45.00, 'pending',  '2026-01-25'),
-(21, 1, 45.00, 'pending',  '2026-01-26');
+(5,  1, 45.00, 'accepted', '2026-01-25'),  -- Karan: placed at Google SWE
+(18, 1, 45.00, 'pending',  '2026-01-25'),  -- Shreya: Google offer pending
+(21, 1, 45.00, 'pending',  '2026-01-26');  -- Prathamesh: Google offer pending
+
+-- Manually mark Karan as ineligible (placed) after his historical data is seeded
+UPDATE STUDENT SET eligible = FALSE WHERE student_id = 5;

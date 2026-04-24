@@ -37,28 +37,11 @@ router.post('/', async (req, res) => {
             [student_id, role_id, package_offered, today]
         );
 
-        // Also update the application status to 'offered'
+        // Update the application status to 'offered'
         await db.query(
             "UPDATE APPLICATION SET status = 'offered' WHERE student_id = ? AND role_id = ?",
             [student_id, role_id]
         );
-
-        // Try to notify student via email (non-blocking — don't crash if mail fails)
-        try {
-            const [[student]] = await db.query(
-                'SELECT name FROM STUDENT WHERE student_id = ?', [student_id]
-            );
-            const [[role]]    = await db.query(
-                'SELECT title, package_lpa FROM JOB_ROLE WHERE role_id = ?', [role_id]
-            );
-            const [[company]] = await db.query(
-                'SELECT c.name FROM COMPANY c JOIN JOB_ROLE jr ON c.company_id = jr.company_id WHERE jr.role_id = ?',
-                [role_id]
-            );
-            // NOTE: Add student email to schema if you want real email notifications
-            // For now this is a placeholder demonstrating the feature
-            console.log(`📧 Offer notification: ${student.name} received offer from ${company.name} for ${role.title} at ${package_offered} LPA`);
-        } catch (_) { /* silently ignore mail errors */ }
 
         res.status(201).json({ message: 'Offer created successfully', offer_id: result.insertId });
     } catch (err) {
@@ -66,51 +49,54 @@ router.post('/', async (req, res) => {
     }
 });
 
-// PUT accept an offer (FIRES DB TRIGGER + SENDS REAL EMAIL)
+// PUT accept an offer — calls the stored procedure instead of a raw UPDATE
+// The procedure handles:
+//   1. Accepting this offer (which fires trg_auto_reject_on_acceptance)
+//   2. Declining all other pending offers for the same student
+//   Both steps run inside a single transaction inside the procedure.
 router.put('/:offer_id/accept', async (req, res) => {
     try {
-        // 0. PREVENT DOUBLE-CLICKS (The Bug Fix!)
-        const [[currentOffer]] = await db.query(
-            "SELECT acceptance_status FROM OFFER WHERE offer_id = ?", 
-            [req.params.offer_id]
-        );
+        const offerId = parseInt(req.params.offer_id);
 
-        if (currentOffer.acceptance_status === 'accepted') {
-            return res.status(400).json({ error: 'This offer has already been accepted!' });
+        // Guard: prevent double-accepts
+        const [[current]] = await db.query(
+            'SELECT acceptance_status, student_id FROM OFFER WHERE offer_id = ?',
+            [offerId]
+        );
+        if (!current) {
+            return res.status(404).json({ error: 'Offer not found.' });
+        }
+        if (current.acceptance_status === 'accepted') {
+            return res.status(400).json({ error: 'This offer has already been accepted.' });
         }
 
-        // 1. The Database does the heavy lifting (Trigger fires to reject other apps)
-        await db.query(
-            "UPDATE OFFER SET acceptance_status = 'accepted' WHERE offer_id = ?",
-            [req.params.offer_id]
-        );
+        // Call the stored procedure — this is the only SQL needed
+        await db.query('CALL accept_placement_offer(?)', [offerId]);
 
-        // 2. Fetch the data we need for the email
+        // Fetch details for the confirmation email
         const [[offerDetails]] = await db.query(`
-            SELECT s.name AS student_name, s.email, c.name AS company_name, jr.title AS role_title, o.package_offered
+            SELECT s.name AS student_name, s.email,
+                   c.name AS company_name, jr.title AS role_title,
+                   o.package_offered
             FROM OFFER o
-            JOIN STUDENT s ON o.student_id = s.student_id
-            JOIN JOB_ROLE jr ON o.role_id = jr.role_id
-            JOIN COMPANY c ON jr.company_id = c.company_id
+            JOIN STUDENT  s  ON o.student_id  = s.student_id
+            JOIN JOB_ROLE jr ON o.role_id      = jr.role_id
+            JOIN COMPANY  c  ON jr.company_id  = c.company_id
             WHERE o.offer_id = ?
-        `, [req.params.offer_id]);
+        `, [offerId]);
 
-        // 3. Send the REAL Email using Nodemailer
-        if (offerDetails && offerDetails.email) {
-            const emailSent = await sendMail({
-                to: offerDetails.email,
-                subject: `🎉 Congratulations! Offer Accepted at ${offerDetails.company_name}`,
-                text: `Dear ${offerDetails.student_name},\n\nThis is an automated confirmation from the IITK Placement Portal.\n\nYour acceptance for the ${offerDetails.role_title} role at ${offerDetails.company_name} (${offerDetails.package_offered} LPA) has been officially recorded.\n\nAs per CDC policy, all of your other pending applications have been automatically withdrawn by the system.\n\nCongratulations on your placement!`
-            });
-
-            if (emailSent) {
-                console.log(`✅ Success: DB Triggers fired AND Email sent to ${offerDetails.email}`);
-            }
+        // Send confirmation email (non-blocking)
+        if (offerDetails?.email) {
+            try {
+                await sendMail({
+                    to: offerDetails.email,
+                    subject: `🎉 Offer Accepted — ${offerDetails.company_name}`,
+                    text: `Dear ${offerDetails.student_name},\n\nYour acceptance for the ${offerDetails.role_title} role at ${offerDetails.company_name} (${offerDetails.package_offered} LPA) has been recorded.\n\nAll other pending applications have been automatically withdrawn as per CDC policy.\n\nCongratulations!`
+                });
+            } catch (_) { /* mail failure must not break the response */ }
         }
 
-        res.json({
-            message: '✅ Offer accepted! DB Triggers fired and confirmation email sent.'
-        });
+        res.json({ message: '✅ Offer accepted! Triggers fired and other offers declined.' });
 
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -130,18 +116,36 @@ router.put('/:offer_id/decline', async (req, res) => {
     }
 });
 
-// GET offers for a specific student only (for student dashboard)
+// GET offers for a specific student (student dashboard)
 router.get('/my/:student_id', async (req, res) => {
     try {
         const [rows] = await db.query(`
             SELECT o.offer_id, o.acceptance_status, o.package_offered, o.offer_date,
                    c.name AS company, jr.title AS role
             FROM OFFER o
-            JOIN JOB_ROLE jr ON o.role_id = jr.role_id
-            JOIN COMPANY c ON jr.company_id = c.company_id
+            JOIN JOB_ROLE jr ON o.role_id      = jr.role_id
+            JOIN COMPANY  c  ON jr.company_id  = c.company_id
             WHERE o.student_id = ?
             ORDER BY o.offer_date DESC
         `, [req.params.student_id]);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET eligible applicants for a specific role (used by the cascading offer modal)
+router.get('/applicants/:role_id', async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT s.student_id, s.name, s.roll_no, s.branch, s.cpi, a.status
+            FROM APPLICATION a
+            JOIN STUDENT s ON a.student_id = s.student_id
+            WHERE a.role_id = ?
+              AND a.status IN ('applied', 'shortlisted')
+              AND s.eligible = TRUE
+            ORDER BY s.cpi DESC
+        `, [req.params.role_id]);
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
