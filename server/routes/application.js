@@ -65,6 +65,22 @@ router.put('/:app_id/status', async (req, res) => {
         if (!validStatuses.includes(status)) {
             return res.status(400).json({ error: 'Invalid status' });
         }
+
+        // Block changes if student is already placed
+        const [[app]] = await db.query(
+            `SELECT s.eligible, s.name 
+             FROM APPLICATION a 
+             JOIN STUDENT s ON a.student_id = s.student_id 
+             WHERE a.app_id = ?`,
+            [req.params.app_id]
+        );
+        if (!app) {
+            return res.status(404).json({ error: 'Application not found' });
+        }
+        if (!app.eligible) {
+            return res.status(400).json({ error: `Cannot modify application — ${app.name} is already placed` });
+        }
+
         await db.query(
             'UPDATE APPLICATION SET status = ? WHERE app_id = ?',
             [status, req.params.app_id]
