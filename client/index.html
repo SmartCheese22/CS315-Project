@@ -1218,6 +1218,16 @@ async function declineMyOffer(id){
 
 async function loadOpenRoles(){
   try{
+    const fresh = await api(`/student/${currentUser.roll_no}`);
+    if(!fresh.eligible){
+      document.getElementById('open-roles-table').innerHTML=`
+        <div class="empty">
+          <div class="empty-icon">🎉</div>
+          <div class="empty-text" style="color:var(--accent);font-size:14px">You are already placed!</div>
+          <div class="empty-text" style="margin-top:8px">No further applications are allowed as per CDC policy.</div>
+        </div>`;
+      return;
+    }
     const roles=await api('/company/roles/open');
     document.getElementById('open-roles-table').innerHTML=roles.length?`
       <table><thead><tr><th>Company</th><th>Sector</th><th>Role</th><th>Package</th><th>Location</th><th>Openings</th><th>Min CPI</th><th>Action</th></tr></thead>
@@ -1231,12 +1241,10 @@ async function loadOpenRoles(){
           <td class="muted-cell">${r.location||'—'}</td>
           <td class="mono">${r.openings}</td>
           <td class="mono" style="color:${eligible?'var(--green)':'var(--red)'}">${r.min_cpi} ${eligible?'✓':'✗'}</td>
-          <td>
-            ${eligible
-              ? `<button class="btn btn-primary btn-sm" onclick="studentApply(${r.role_id}, this)">Apply</button>`
-              : `<span style="font-size:10px;color:var(--muted)">CPI too low</span>`
-            }
-          </td>
+          <td>${eligible
+            ? `<button class="btn btn-primary btn-sm" onclick="studentApply(${r.role_id}, this)">Apply</button>`
+            : `<span style="font-size:10px;color:var(--muted)">CPI too low</span>`
+          }</td>
         </tr>`;
       }).join('')}</tbody></table>`:
       '<div class="empty"><div class="empty-icon">◎</div><div class="empty-text">No open roles right now</div></div>';

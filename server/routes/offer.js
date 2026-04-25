@@ -25,7 +25,6 @@ router.get('/', async (req, res) => {
 });
 
 // POST create a new offer for a student
-// POST create a new offer for a student
 router.post('/', async (req, res) => {
     try {
         const { student_id, role_id, package_offered } = req.body;
@@ -56,6 +55,14 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ error: 'An offer already exists for this student and role' });
         }
 
+       // Block if student already has an accepted offer
+        const [[placed]] = await db.query(
+            'SELECT offer_id FROM OFFER WHERE student_id = ? AND acceptance_status = ?',
+            [student_id, 'accepted']
+        );
+        if (placed) {
+            return res.status(400).json({ error: 'This student is already placed and cannot receive new offers' });
+        } 
         const today = new Date().toISOString().slice(0, 10);
         const [result] = await db.query(
             'INSERT INTO OFFER (student_id, role_id, package_offered, offer_date) VALUES (?, ?, ?, ?)',
