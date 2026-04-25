@@ -79,4 +79,14 @@ router.get('/shortlist/:role_id', async (req, res) => {
     }
 });
 
+// DELETE a student
+router.delete('/:student_id', async (req, res) => {
+    try {
+        await db.query('DELETE FROM STUDENT WHERE student_id = ?', [req.params.student_id]);
+        res.json({ message: 'Student deleted' });
+    } catch(err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 export default router;

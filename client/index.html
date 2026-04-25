@@ -863,7 +863,7 @@ async function loadStudents() {
     const students = await api('/student');
     document.getElementById('student-count-sub').textContent=`TABLE: STUDENT · ${students.length} records`;
     document.getElementById('students-table').innerHTML=`
-      <table><thead><tr><th>#</th><th>Roll No</th><th>Name</th><th>Branch</th><th>CPI</th><th>Grad Year</th><th>Status</th></tr></thead>
+      <table><thead><tr><th>#</th><th>Roll No</th><th>Name</th><th>Branch</th><th>CPI</th><th>Grad Year</th><th>Status</th><th>Action</th></tr></thead>
       <tbody>${students.map((s,i)=>`<tr>
         <td class="muted-cell mono">${i+1}</td>
         <td class="mono" style="color:var(--accent2)">${s.roll_no}</td>
@@ -871,6 +871,7 @@ async function loadStudents() {
         <td><div class="cpi-bar" style="gap:6px"><div class="cpi-pip" style="background:${s.cpi>=8.5?'var(--green)':s.cpi>=7?'var(--yellow)':'var(--red)'}"></div><span class="mono" style="color:${s.cpi>=8.5?'var(--green)':s.cpi>=7?'var(--yellow)':'var(--red)'}">${s.cpi}</span></div></td>
         <td class="mono muted-cell">${s.grad_year}</td>
         <td>${s.eligible?'<span class="pill pill-green">Eligible</span>':'<span class="pill pill-accent">Placed</span>'}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="deleteStudent(${s.student_id}, '${s.name}')">Delete</button></td>
       </tr>`).join('')}</tbody></table>`;
   } catch(e){toast(e.message,'error');}
 }
@@ -900,7 +901,10 @@ async function loadCompanies() {
         <div class="table-header">
           <div><div class="table-header-title" style="display:flex;align-items:center;gap:10px;">${c.name} ${sectorPill(c.sector)}</div>
           <div class="table-header-sub">Min CPI: <span style="color:var(--yellow)">${c.min_cpi}</span> · HR: ${c.hr_contact||'—'} · Roles: ${s.total_roles||0} · Offers: ${s.total_offers||0} · Accepted: ${s.accepted_offers||0} · Avg: ${s.avg_package_offered?s.avg_package_offered+' LPA':'—'}</div></div>
-          <button class="btn btn-outline btn-sm" onclick="openAddRole(${c.company_id},'${c.name}')">+ Add Role</button>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-outline btn-sm" onclick="openAddRole(${c.company_id},'${c.name}')">+ Add Role</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteCompany(${c.company_id},'${c.name}')">Delete</button>
+          </div> 
         </div>
         <div id="roles-${c.company_id}"><div class="loading"><div class="spinner"></div></div></div>
       </div>`;
@@ -915,7 +919,10 @@ async function loadRoles(cid) {
     const el=document.getElementById('roles-'+cid);
     if(!roles.length){el.innerHTML='<div class="empty" style="padding:20px"><div class="empty-text" style="color:var(--muted)">No roles yet</div></div>';return;}
     el.innerHTML=`<table><thead><tr><th>ID</th><th>Title</th><th>Package</th><th>Location</th><th>Openings</th><th>Status</th></tr></thead>
-    <tbody>${roles.map(r=>`<tr><td class="mono muted-cell">#${r.role_id}</td><td><strong>${r.title}</strong></td><td class="mono" style="color:var(--accent)">${r.package_lpa} LPA</td><td class="muted-cell">${r.location||'—'}</td><td class="mono">${r.openings}</td><td>${r.is_open?'<span class="pill pill-green">Open</span>':'<span class="pill pill-muted">Closed</span>'}</td></tr>`).join('')}</tbody></table>`;
+    <tbody>${roles.map(r=>`<tr><td class="mono muted-cell">#${r.role_id}</td><td><strong>${r.title}</strong></td><td class="mono" style="color:var(--accent)">${r.package_lpa} LPA</td><td class="muted-cell">${r.location||'—'}</td><td class="mono">${r.openings}</td>
+        <td>${r.is_open?'<span class="pill pill-green">Open</span>':'<span class="pill pill-muted">Closed</span>'}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="deleteRole(${r.role_id}, ${r.company_id})">Delete</button></td></tr>
+        `).join('')}</tbody></table>`;
   } catch(e){}
 }
 
@@ -1305,6 +1312,36 @@ async function updateRoundResult() {
   } catch(e) {
     toast(e.message, 'error');
   }
+}
+
+async function deleteStudent(id, name) {
+  const input = prompt(`Type "${name}" to confirm deletion:`);
+  if(input !== name) return toast('Deletion cancelled', 'info');
+  try {
+    await api(`/student/${id}`, {method:'DELETE'});
+    toast(`${name} deleted — cascade removed all their applications and offers`, 'success');
+    loadStudents();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function deleteCompany(id, name) {
+  const input = prompt(`Type "${name}" to confirm deletion:`);
+  if(input !== name) return toast('Deletion cancelled', 'info');
+  try {
+    await api(`/company/${id}`, {method:'DELETE'});
+    toast(`${name} deleted — cascade removed all roles and applications`, 'success');
+    loadCompanies();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function deleteRole(role_id, company_id) {
+  const input = prompt('Type "DELETE" to confirm:');
+  if(input !== 'DELETE') return toast('Deletion cancelled', 'info');
+  try {
+    await api(`/company/roles/${role_id}`, {method:'DELETE'});
+    toast('Role deleted — cascade removed all applications for this role', 'success');
+    loadRoles(company_id);
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 // ── MODAL OPENERS WITH POPULATION ──

@@ -84,4 +84,24 @@ router.post('/:company_id/roles', async (req, res) => {
     }
 });
 
+// DELETE a company
+router.delete('/:company_id', async (req, res) => {
+    try {
+        await db.query('DELETE FROM COMPANY WHERE company_id = ?', [req.params.company_id]);
+        res.json({ message: 'Company deleted' });
+    } catch(err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DELETE a job role
+router.delete('/roles/:role_id', async (req, res) => {
+    try {
+        await db.query('DELETE FROM JOB_ROLE WHERE role_id = ?', [req.params.role_id]);
+        res.json({ message: 'Role deleted' });
+    } catch(err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 export default router;
