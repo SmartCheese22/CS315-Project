@@ -244,14 +244,17 @@ tbody td{padding:11px 16px;font-size:12px;color:var(--text);white-space:nowrap;}
 
     <!-- Step 2: OTP -->
     <div class="login-step" id="step-otp">
-      <div class="otp-sent-info" id="otp-sent-msg"></div>
-      <label class="login-label">Enter OTP</label>
-      <input class="login-input" id="login-otp" type="text" maxlength="6" placeholder="6-digit OTP"
-             onkeydown="if(event.key==='Enter') verifyOTP()"/>
-      <div class="login-err" id="otp-err"></div>
-      <button class="login-btn" id="verify-btn" onclick="verifyOTP()">Verify & Login →</button>
-      <button class="login-back" onclick="backToEmail()">← Back</button>
-    </div>
+  <div class="otp-sent-info" id="otp-sent-msg"></div>
+  <label class="login-label">Enter OTP</label>
+  <input class="login-input" id="login-otp" type="text" maxlength="6" placeholder="6-digit OTP"
+         onkeydown="if(event.key==='Enter') verifyOTP()"/>
+  <div class="login-err" id="otp-err"></div>
+  <button class="login-btn" id="verify-btn" onclick="verifyOTP()">Verify & Login →</button>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
+    <button class="login-back" onclick="backToEmail()">← Back</button>
+    <button class="login-back" id="resend-btn" onclick="resendOTP()">Resend OTP</button>
+  </div>
+</div>
   </div>
 </div>
 
@@ -640,6 +643,34 @@ function backToEmail() {
   document.getElementById('step-email').classList.add('active');
   document.getElementById('login-otp').value='';
   document.getElementById('otp-err').textContent='';
+}
+
+async function resendOTP() {
+  const email = document.getElementById('login-email').value.trim();
+  const btn = document.getElementById('resend-btn');
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+  document.getElementById('otp-err').textContent = '';
+  try {
+    await api('/auth/send-otp', {method:'POST', body:JSON.stringify({email})});
+    document.getElementById('otp-sent-msg').textContent = `OTP resent to ${email}. Check your inbox.`;
+    document.getElementById('login-otp').value = '';
+    // Cooldown — prevent spam clicking
+    let secs = 30;
+    const interval = setInterval(()=>{
+      btn.textContent = `Resend in ${secs}s`;
+      secs--;
+      if(secs < 0){
+        clearInterval(interval);
+        btn.disabled = false;
+        btn.textContent = 'Resend OTP';
+      }
+    }, 1000);
+  } catch(e) {
+    document.getElementById('otp-err').textContent = e.message;
+    btn.disabled = false;
+    btn.textContent = 'Resend OTP';
+  }
 }
 
 function logout() {
