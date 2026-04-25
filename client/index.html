@@ -222,6 +222,14 @@ tbody td{padding:11px 16px;font-size:12px;color:var(--text);white-space:nowrap;}
 ::-webkit-scrollbar{width:4px;height:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+input[type="date"] {
+  color-scheme: dark;
+}
 </style>
 </head>
 <body>
@@ -547,6 +555,33 @@ tbody td{padding:11px 16px;font-size:12px;color:var(--text);white-space:nowrap;}
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('interview-modal')">Cancel</button>
       <button class="btn btn-primary" onclick="addInterviewRound()">Add Round</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="update-round-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Update Round Result</h3>
+      <button class="modal-close" onclick="closeModal('update-round-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Select Round</label>
+        <select class="form-select" id="ur-round-select"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">New Result</label>
+        <select class="form-select" id="ur-result">
+          <option value="pending">Pending</option>
+          <option value="pass">Pass</option>
+          <option value="fail">Fail</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('update-round-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="updateRoundResult()">Update Result</button>
     </div>
   </div>
 </div>
@@ -905,6 +940,7 @@ async function loadApplications() {
           <button class="btn btn-outline btn-sm" onclick="updateAppStatus(${a.app_id},'shortlisted')">shortlist</button>
           <button class="btn btn-outline btn-sm" onclick="updateAppStatus(${a.app_id},'rejected')">reject</button>
           <button class="btn btn-outline btn-sm" onclick="openInterviewModal(${a.app_id})">+ Round</button>
+          <button class="btn btn-outline btn-sm" onclick="openUpdateRoundModal(${a.app_id}, '${a.student_name}')">✎ Round</button>
         </div></td>
       </tr>`).join('')}</tbody></table>`;
   } catch(e){toast(e.message,'error');}
@@ -1228,6 +1264,38 @@ async function studentApply(role_id, btn) {
     toast(e.message, 'error');
     btn.disabled = false;
     btn.textContent = 'Apply';
+  }
+}
+
+async function openUpdateRoundModal(app_id, studentName) {
+  try {
+    const rounds = await api(`/interview/application/${app_id}`);
+    if (!rounds.length) {
+      toast('No rounds added for this application yet', 'error');
+      return;
+    }
+    document.querySelector('#update-round-modal .modal-head h3').textContent = `Update Round — ${studentName}`;
+    document.getElementById('ur-round-select').innerHTML = rounds.map(r =>
+      `<option value="${r.round_id}">Round ${r.round_no} — ${r.round_type} (currently: ${r.result})</option>`
+    ).join('');
+    openModal('update-round-modal');
+  } catch(e) {
+    toast(e.message, 'error');
+  }
+}
+
+async function updateRoundResult() {
+  const round_id = document.getElementById('ur-round-select').value;
+  const result   = document.getElementById('ur-result').value;
+  try {
+    await api(`/interview/${round_id}/result`, {
+      method: 'PUT',
+      body: JSON.stringify({ result })
+    });
+    closeModal('update-round-modal');
+    toast(`Round result updated to "${result}" ✓`, 'success');
+  } catch(e) {
+    toast(e.message, 'error');
   }
 }
 
