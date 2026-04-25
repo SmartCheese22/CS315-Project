@@ -550,8 +550,14 @@ tbody td{padding:11px 16px;font-size:12px;color:var(--text);white-space:nowrap;}
 
 <script>
 const API = 'https://placement-portal-api-6m2r.onrender.com';
-let currentUser = null; // { name, email, role, student_id?, roll_no?, ... }
+let currentUser = null;
 
+// Restore session on refresh
+const _saved = sessionStorage.getItem('placementUser');
+if (_saved) {
+  currentUser = JSON.parse(_saved);
+  initApp();
+}
 // ── UTILS ──
 function toast(msg, type='info') {
   const c = document.getElementById('toast-container');
@@ -620,6 +626,7 @@ async function verifyOTP() {
   try {
     const data = await api('/auth/verify-otp', {method:'POST', body:JSON.stringify({email,otp})});
     currentUser = data.user;
+    sessionStorage.setItem('placementUser', JSON.stringify(currentUser));
     initApp();
   } catch(e) {
     document.getElementById('otp-err').textContent = e.message;
@@ -637,6 +644,7 @@ function backToEmail() {
 
 function logout() {
   currentUser = null;
+  sessionStorage.removeItem('placementUser');
   document.getElementById('app-shell').classList.remove('visible');
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('login-email').value='';
