@@ -87,8 +87,41 @@ router.post('/:company_id/roles', async (req, res) => {
 // DELETE a company
 router.delete('/:company_id', async (req, res) => {
     try {
+        // Find students placed via this company
+        const [placedStudents] = await db.query(
+            `SELECT DISTINCT o.student_id 
+             FROM OFFER o
+             JOIN JOB_ROLE jr ON o.role_id = jr.role_id
+             WHERE jr.company_id = ? AND o.acceptance_status = 'accepted'`,
+            [req.params.company_id]
+        );
+
+        // Find all roles for this company to restore rejected applications
+        const [roles] = await db.query(
+            'SELECT role_id FROM JOB_ROLE WHERE company_id = ?',
+            [req.params.company_id]
+        );
+
         await db.query('DELETE FROM COMPANY WHERE company_id = ?', [req.params.company_id]);
-        res.json({ message: 'Company deleted' });
+
+        // Reset eligible for placed students
+        for (const s of placedStudents) {
+            await db.query(
+                'UPDATE STUDENT SET eligible = TRUE WHERE student_id = ?',
+                [s.student_id]
+            );
+        }
+
+        // Restore rejected applications for all this company's roles
+        for (const r of roles) {
+            await db.query(
+                `UPDATE APPLICATION SET status = 'applied'
+                 WHERE role_id = ? AND status = 'rejected'`,
+                [r.role_id]
+            );
+        }
+
+        res.json({ message: 'Company deleted, affected students re-eligible, applications restored' });
     } catch(err) {
         res.status(500).json({ error: err.message });
     }
@@ -97,8 +130,26 @@ router.delete('/:company_id', async (req, res) => {
 // DELETE a job role
 router.delete('/roles/:role_id', async (req, res) => {
     try {
+        // Find students placed via this role
+        const [placedStudents] = await db.query(
+            `SELECT student_id FROM OFFER 
+             WHERE role_id = ? AND acceptance_status = 'accepted'`,
+            [req.params.role_id]
+        );
+
         await db.query('DELETE FROM JOB_ROLE WHERE role_id = ?', [req.params.role_id]);
-        res.json({ message: 'Role deleted' });
+
+        // Reset eligible for affected students
+        for (const s of placedStudents) {
+            await db.query(
+                'UPDATE STUDENT SET eligible = TRUE WHERE student_id = ?',
+                [s.student_id]
+            );
+        }
+
+        // No need to restore applications — they're cascade deleted with the role
+
+        res.json({ message: 'Role deleted, affected students re-eligible' });
     } catch(err) {
         res.status(500).json({ error: err.message });
     }

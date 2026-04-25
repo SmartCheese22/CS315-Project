@@ -82,8 +82,29 @@ router.get('/shortlist/:role_id', async (req, res) => {
 // DELETE a student
 router.delete('/:student_id', async (req, res) => {
     try {
+        // Get accepted offers before deletion
+        const [acceptedOffers] = await db.query(
+            'SELECT role_id FROM OFFER WHERE student_id = ? AND acceptance_status = ?',
+            [req.params.student_id, 'accepted']
+        );
+
         await db.query('DELETE FROM STUDENT WHERE student_id = ?', [req.params.student_id]);
-        res.json({ message: 'Student deleted' });
+
+        for (const offer of acceptedOffers) {
+            // Reopen the role
+            await db.query(
+                'UPDATE JOB_ROLE SET is_open = TRUE WHERE role_id = ?',
+                [offer.role_id]
+            );
+            // Restore other students' rejected applications back to applied
+            await db.query(
+                `UPDATE APPLICATION SET status = 'applied' 
+                 WHERE role_id = ? AND status = 'rejected'`,
+                [offer.role_id]
+            );
+        }
+
+        res.json({ message: 'Student deleted, roles reopened, affected applications restored' });
     } catch(err) {
         res.status(500).json({ error: err.message });
     }
